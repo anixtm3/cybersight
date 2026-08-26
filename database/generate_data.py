@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import numpy as np
 import pandas as pd
 import psycopg2
@@ -9,7 +11,7 @@ import random
 conn = psycopg2.connect(
     dbname="cybersight",
     user="postgres",
-    password=os.environ.get("DB_PASSWORD", "33aA2#bB"),
+    password=os.environ.get("DB_PASSWORD", ""),
     host="localhost",
     port="5433"
 )

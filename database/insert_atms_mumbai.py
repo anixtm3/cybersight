@@ -1,11 +1,13 @@
 import json
 import psycopg2
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 conn = psycopg2.connect(
     dbname="cybersight",
     user="postgres",
-    password=os.environ.get("DB_PASSWORD", "33aA2#bB"),  # apna password daalo
+    password=os.environ.get("DB_PASSWORD", ""),  # apna password daalo
     host="localhost",
     port="5433"
 )
