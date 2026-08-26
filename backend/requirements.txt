@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+python-jose[cryptography]
+passlib[bcrypt]
+python-dotenv
+web3
+pandas
+numpy
+geoalchemy2
+slowapi
+httpx
+bcrypt==4.0.1
