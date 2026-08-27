@@ -11,11 +11,12 @@ audit logging.
 ## Status
 
 Day 1 - Security foundation and design documented. Core logic
-(PII masking, rate limiting, RBAC, audit logging) implemented and
-independently tested using a standalone mock environment. Full
-backend integration is pending confirmation of the API contract
-(user model, JWT payload structure, and route definitions) from
-the backend team.
+(PII masking, rate limiting, RBAC, password security, alert
+dispatch, audit logging) implemented and independently tested
+using a standalone mock environment plus an automated pytest
+suite. Full backend integration is pending confirmation of the
+API contract (user model, JWT payload structure, and route
+definitions) from the backend team.
 
 ## Files
 
@@ -32,17 +33,30 @@ the backend team.
 | 08-rate-limiting-api-abuse-protection.md | Rate limiting and API abuse protection |
 | 09-pii-protection-data-privacy.md | PII masking and data minimization |
 | 10-audit-logging-security-events.md | Audit logging and security event tracking |
-| 11-testing-evidence.md | Independent testing evidence (PII masking, RBAC, rate limiting) |
+| 11-testing-evidence.md | Independent testing evidence (PII masking, RBAC, rate limiting, pytest suite) |
 
 ## Code
 
 | File | Covers |
 |---|---|
-| src/pii_masking.py | Phone, email, account number masking functions |
+| src/pii_masking.py | Phone, email, account, Aadhaar, PAN, address masking functions |
 | src/rate_limiter.py | In-memory rate limiter (5 attempts / 60 seconds) |
 | src/rbac.py | JWT token creation, decoding, and role-based access dependency |
 | src/audit_log.py | JSON-lines audit event logger |
+| src/password_security.py | Password hashing and verification using bcrypt |
+| src/alert_dispatch.py | Mocked multi-channel alert dispatch (SMS, email, webhook) |
 | src/mock_app.py | Standalone FastAPI app used to independently test the above |
+| src/test_security.py | Automated pytest suite for all security modules |
+
+## Testing
+
+Run the automated test suite:
+
+    cd security/src
+    pytest test_security.py -v
+
+12 tests covering PII masking, password security, RBAC token
+creation, and alert dispatch. All passing as of last run.
 
 ## Pending
 

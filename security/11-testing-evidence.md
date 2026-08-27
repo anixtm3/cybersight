@@ -69,3 +69,16 @@ All three items independently verified using a standalone mock
 environment, without requiring the confirmed backend contract.
 Integration testing against the real backend (Saina/Kartike) will
 follow once the auth contract is finalized.
+
+
+### Test 4 - Automated Test Suite (pytest)
+
+Twelve automated tests covering PII masking (phone, email, account,
+Aadhaar, PAN, address), password hashing/verification, JWT token
+creation, and multi-channel alert dispatch (SMS, email, webhook).
+
+Run with: `pytest test_security.py -v` (from `security/src`)
+
+Result: 12 passed, 1 warning (JWT key length recommendation, non-blocking)
+
+All independently verifiable, repeatable via a single command.
