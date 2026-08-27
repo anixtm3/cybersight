@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Database connection
 conn = psycopg2.connect(
     dbname="cybersight",
     user="postgres",
@@ -18,7 +17,6 @@ conn = psycopg2.connect(
 )
 cur = conn.cursor()
 
-# Causal rules
 FRAUD_TYPE_CONFIG = {
     'UPI Fraud':         {'hop_min': 2, 'hop_max': 4, 'amount_mean': 8,  'amount_std': 1.2, 'displacement_factor': 1.0},
     'OLX Scam':          {'hop_min': 1, 'hop_max': 3, 'amount_mean': 9,  'amount_std': 1.0, 'displacement_factor': 0.8},
@@ -32,24 +30,25 @@ FRAUD_TYPE_CONFIG = {
 
 BANKS = ['SBI', 'HDFC', 'ICICI', 'Axis', 'PNB', 'Kotak', 'BOB', 'Canara']
 
-# Fix 1 — Bank corridor: har bank ka preferred direction (degrees) aur reach (km multiplier)
 BANK_CONFIG = {
-    'SBI':    {'preferred_bearing': 45,  'reach_factor': 1.2},  # Northeast
-    'HDFC':   {'preferred_bearing': 90,  'reach_factor': 1.0},  # East
-    'ICICI':  {'preferred_bearing': 135, 'reach_factor': 1.1},  # Southeast
-    'Axis':   {'preferred_bearing': 180, 'reach_factor': 0.9},  # South
-    'PNB':    {'preferred_bearing': 225, 'reach_factor': 1.3},  # Southwest
-    'Kotak':  {'preferred_bearing': 270, 'reach_factor': 0.8},  # West
-    'BOB':    {'preferred_bearing': 315, 'reach_factor': 1.0},  # Northwest
-    'Canara': {'preferred_bearing': 0,   'reach_factor': 1.1},  # North
+    'SBI':    {'preferred_bearing': 45,  'reach_factor': 1.2},
+    'HDFC':   {'preferred_bearing': 90,  'reach_factor': 1.0},
+    'ICICI':  {'preferred_bearing': 135, 'reach_factor': 1.1},
+    'Axis':   {'preferred_bearing': 180, 'reach_factor': 0.9},
+    'PNB':    {'preferred_bearing': 225, 'reach_factor': 1.3},
+    'Kotak':  {'preferred_bearing': 270, 'reach_factor': 0.8},
+    'BOB':    {'preferred_bearing': 315, 'reach_factor': 1.0},
+    'Canara': {'preferred_bearing': 0,   'reach_factor': 1.1},
 }
 
-# 4 city regions
+# 6 cities now
 CITY_REGIONS = [
-    {'name': 'Delhi',     'district': 'Delhi',     'state': 'Delhi',        'lat_range': (28.4, 28.9), 'lon_range': (76.8, 77.4), 'weight': 0.40},
-    {'name': 'Delhi NCR', 'district': 'Delhi NCR', 'state': 'Haryana',      'lat_range': (28.3, 29.0), 'lon_range': (76.5, 77.8), 'weight': 0.25},
-    {'name': 'Mumbai',    'district': 'Mumbai',    'state': 'Maharashtra',  'lat_range': (18.8, 19.3), 'lon_range': (72.7, 73.1), 'weight': 0.25},
-    {'name': 'Jamtara',   'district': 'Jamtara',   'state': 'Jharkhand',    'lat_range': (23.8, 24.2), 'lon_range': (86.8, 87.2), 'weight': 0.10},
+    {'name': 'Delhi',      'district': 'Delhi',      'state': 'Delhi',        'lat_range': (28.4, 28.9), 'lon_range': (76.8, 77.4), 'weight': 0.30},
+    {'name': 'Delhi NCR',  'district': 'Delhi NCR',  'state': 'Haryana',      'lat_range': (28.3, 29.0), 'lon_range': (76.5, 77.8), 'weight': 0.20},
+    {'name': 'Mumbai',     'district': 'Mumbai',     'state': 'Maharashtra',  'lat_range': (18.8, 19.3), 'lon_range': (72.7, 73.1), 'weight': 0.20},
+    {'name': 'Jamtara',    'district': 'Jamtara',    'state': 'Jharkhand',    'lat_range': (23.8, 24.2), 'lon_range': (86.8, 87.2), 'weight': 0.10},
+    {'name': 'Bengaluru',  'district': 'Bengaluru',  'state': 'Karnataka',    'lat_range': (12.8, 13.1), 'lon_range': (77.4, 77.8), 'weight': 0.10},
+    {'name': 'Hyderabad',  'district': 'Hyderabad',  'state': 'Telangana',    'lat_range': (17.2, 17.6), 'lon_range': (78.3, 78.6), 'weight': 0.10},
 ]
 CITY_WEIGHTS = [c['weight'] for c in CITY_REGIONS]
 
@@ -60,7 +59,6 @@ def pick_city():
 
 
 def compute_alert_level(amount, hop_count):
-    """Fix 2 — alert_level derived from amount + hops, not random"""
     score = 0
     if amount > 500000:   score += 2
     elif amount > 100000: score += 1
@@ -71,21 +69,27 @@ def compute_alert_level(amount, hop_count):
     else:            return 'LOW'
 
 
-def random_coord_near(lat, lon, hop_count, fraud_type, bank):
-    """Fix 3 — displacement scales with hops + bank corridor"""
+def random_coord_near(lat, lon, hop_count, fraud_type, bank, is_insider=False):
+    """Insider case — withdrawal 2-5km from victim (suspicious close pattern)"""
+    if is_insider:
+        displacement_km = np.random.uniform(2, 5)
+        angle = np.random.uniform(0, 2 * np.pi)
+        displacement_deg = displacement_km / 111
+        new_lat = lat + displacement_deg * np.cos(angle)
+        new_lon = lon + displacement_deg * np.sin(angle)
+        return round(new_lat, 6), round(new_lon, 6)
+
     cfg = FRAUD_TYPE_CONFIG[fraud_type]
     bank_cfg = BANK_CONFIG[bank]
 
-    # Base displacement: 20-60km, scaled by hops and fraud type
     base_km = np.random.uniform(20, 60)
-    hop_multiplier = 1 + (hop_count - 1) * 0.3  # each hop adds 30% distance
+    hop_multiplier = 1 + (hop_count - 1) * 0.3
     fraud_multiplier = cfg['displacement_factor']
     reach_multiplier = bank_cfg['reach_factor']
 
     total_km = base_km * hop_multiplier * fraud_multiplier * reach_multiplier
     total_km = np.clip(total_km, 20, 300)
 
-    # Direction: bank preferred bearing with noise (+/- 45 degrees)
     preferred = bank_cfg['preferred_bearing']
     bearing_deg = preferred + np.random.uniform(-45, 45)
     bearing_rad = np.radians(bearing_deg)
@@ -116,8 +120,12 @@ def generate_complaints(n=50000):
         victim_lon = round(np.random.uniform(*city['lon_range']), 6)
 
         bank = random.choice(BANKS)
+
+        # 5% insider cases
+        is_insider = np.random.random() < 0.05
+
         withdrawal_lat, withdrawal_lon = random_coord_near(
-            victim_lat, victim_lon, hop_count, fraud_type, bank
+            victim_lat, victim_lon, hop_count, fraud_type, bank, is_insider
         )
 
         alert_level = compute_alert_level(amount, hop_count)
@@ -143,6 +151,7 @@ def generate_complaints(n=50000):
             'victim_state':       city['state'],
             'status':             'closed',
             'alert_level':        alert_level,
+            'is_insider_case':    is_insider,
         })
 
     return pd.DataFrame(records)
@@ -154,7 +163,6 @@ def verify_correlations(df):
     corr_hops_amount, _ = stats.spearmanr(df['number_of_hops'], df['amount_lost'])
     print(f"hops vs amount: {corr_hops_amount:.3f}")
 
-    # displacement vs hops — should be positive now
     df['displacement_km'] = np.sqrt(
         (df['withdrawal_lat'] - df['victim_lat'])**2 +
         (df['withdrawal_lon'] - df['victim_lon'])**2
@@ -162,11 +170,11 @@ def verify_correlations(df):
     corr_disp_hops, _ = stats.spearmanr(df['displacement_km'], df['number_of_hops'])
     print(f"displacement vs hops: {corr_disp_hops:.3f}  ← should be > 0.2")
 
-    # alert_level distribution
+    print(f"\nInsider cases: {df['is_insider_case'].sum()} ({df['is_insider_case'].mean()*100:.1f}%)")
+
     print("\nAlert level distribution:")
     print(df['alert_level'].value_counts())
 
-    # alert vs amount
     print("\nMean amount by alert level:")
     print(df.groupby('alert_level')['amount_lost'].mean().sort_values(ascending=False))
 
