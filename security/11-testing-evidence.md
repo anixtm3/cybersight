@@ -82,3 +82,18 @@ Run with: `pytest test_security.py -v` (from `security/src`)
 Result: 12 passed, 1 warning (JWT key length recommendation, non-blocking)
 
 All independently verifiable, repeatable via a single command.
+
+
+### Test 5 - Evidence Documentation and Alert Trigger Endpoints
+
+Three additional endpoint tests added to the automated suite:
+
+- Evidence log entry created and retrieved successfully by an
+  investigator role
+- Evidence log write correctly denied (403) for a non-investigator
+  role (admin)
+- Alert trigger endpoint correctly denied (403) for a non-admin role
+  (investigator), and correctly succeeds (200) for admin, dispatching
+  to 2 channels
+
+Total automated test count: 15 (all passing).

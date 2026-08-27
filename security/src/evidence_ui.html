@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CyberSight - Evidence Documentation</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; background: #0d1117; color: #e6edf3; }
+  h1 { font-size: 20px; }
+  label { display: block; margin-top: 15px; font-size: 14px; color: #9da7b1; }
+  input, textarea, select { width: 100%; padding: 8px; margin-top: 4px; background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; box-sizing: border-box; }
+  button { margin-top: 20px; padding: 10px 16px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; }
+  button:hover { background: #2ea043; }
+  .entry { border: 1px solid #30363d; border-radius: 6px; padding: 12px; margin-top: 12px; background: #161b22; }
+  .entry-meta { font-size: 12px; color: #9da7b1; }
+</style>
+</head>
+<body>
+
+<h1>CyberSight - Evidence Documentation</h1>
+<p style="color:#9da7b1; font-size:14px;">Investigator case notes and action logging (Day 1 prototype - local only, no backend yet)</p>
+
+<label for="caseId">Case ID</label>
+<input type="text" id="caseId" placeholder="e.g. CS-2026-00123">
+
+<label for="investigator">Investigator Name</label>
+<input type="text" id="investigator" placeholder="e.g. Kanav Agarwal">
+
+<label for="actionType">Action Type</label>
+<select id="actionType">
+  <option>Evidence Reviewed</option>
+  <option>CCTV Preservation Requested</option>
+  <option>Mule Account Flagged</option>
+  <option>Alert Acknowledged</option>
+  <option>Case Note</option>
+</select>
+
+<label for="notes">Notes</label>
+<textarea id="notes" rows="4" placeholder="Describe the action or finding..."></textarea>
+
+<button onclick="addEntry()">Log Entry</button>
+
+<h2 style="margin-top:30px; font-size:16px;">Case Log</h2>
+<div id="log"></div>
+
+<script>
+let entries = JSON.parse(localStorage.getItem("cybersight_evidence_log") || "[]");
+
+function render() {
+  const log = document.getElementById("log");
+  log.innerHTML = "";
+  entries.slice().reverse().forEach(e => {
+    const div = document.createElement("div");
+    div.className = "entry";
+    div.innerHTML = `
+      <div><strong>${e.actionType}</strong> - Case ${e.caseId}</div>
+      <div>${e.notes}</div>
+      <div class="entry-meta">By ${e.investigator} at ${e.timestamp}</div>
+    `;
+    log.appendChild(div);
+  });
+}
+
+function addEntry() {
+  const caseId = document.getElementById("caseId").value.trim();
+  const investigator = document.getElementById("investigator").value.trim();
+  const actionType = document.getElementById("actionType").value;
+  const notes = document.getElementById("notes").value.trim();
+
+  if (!caseId || !investigator || !notes) {
+    alert("Please fill in Case ID, Investigator Name, and Notes.");
+    return;
+  }
+
+  const entry = {
+    caseId, investigator, actionType, notes,
+    timestamp: new Date().toISOString()
+  };
+  entries.push(entry);
+  localStorage.setItem("cybersight_evidence_log", JSON.stringify(entries));
+
+  document.getElementById("notes").value = "";
+  render();
+}
+
+render();
+</script>
+
+</body>
+</html>
