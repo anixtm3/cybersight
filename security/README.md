@@ -10,9 +10,12 @@ audit logging.
 
 ## Status
 
-Day 1 - Security foundation and design documented. Implementation
-is pending confirmation of the backend API contract (user model,
-JWT payload structure, and route definitions) from the backend team.
+Day 1 - Security foundation and design documented. Core logic
+(PII masking, rate limiting, RBAC, audit logging) implemented and
+independently tested using a standalone mock environment. Full
+backend integration is pending confirmation of the API contract
+(user model, JWT payload structure, and route definitions) from
+the backend team.
 
 ## Files
 
@@ -29,8 +32,21 @@ JWT payload structure, and route definitions) from the backend team.
 | 08-rate-limiting-api-abuse-protection.md | Rate limiting and API abuse protection |
 | 09-pii-protection-data-privacy.md | PII masking and data minimization |
 | 10-audit-logging-security-events.md | Audit logging and security event tracking |
+| 11-testing-evidence.md | Independent testing evidence (PII masking, RBAC, rate limiting) |
+
+## Code
+
+| File | Covers |
+|---|---|
+| src/pii_masking.py | Phone, email, account number masking functions |
+| src/rate_limiter.py | In-memory rate limiter (5 attempts / 60 seconds) |
+| src/rbac.py | JWT token creation, decoding, and role-based access dependency |
+| src/audit_log.py | JSON-lines audit event logger |
+| src/mock_app.py | Standalone FastAPI app used to independently test the above |
 
 ## Pending
 
-- Section 11 - Alert Dispatch and WebSocket Security: on hold, awaiting
-  confirmation from Kartike on the /ws/alerts authentication approach.
+- Section 11 (backend integration) - full end-to-end testing against
+  the real backend, awaiting confirmed auth contract from Kartike/Saina.
+- Alert Dispatch and WebSocket Security - on hold, awaiting confirmation
+  from Kartike on the /ws/alerts authentication approach.
