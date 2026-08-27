@@ -132,7 +132,8 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String(100), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
-    role = Column(String(20), default='admin')
+    role = Column(String(20), default='cyber_cell_officer')
+    jurisdiction_district = Column(Text)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 
@@ -165,3 +166,62 @@ class ReportMetadata(Base):
     generated_by = Column(String(100))
     software_contribution = Column(Text)
     generated_at = Column(TIMESTAMP, server_default=func.now())
+
+
+# ─── NEW — added to match Saina's Day 2 schema (26 Aug) ────
+
+class CaseNote(Base):
+    __tablename__ = "case_notes"
+
+    id = Column(Integer, primary_key=True)
+    complaint_id = Column(String(50))
+    officer_id = Column(Integer)
+    note = Column(Text, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+
+class ActionLog(Base):
+    __tablename__ = "action_log"
+
+    id = Column(Integer, primary_key=True)
+    complaint_id = Column(String(50))
+    officer_id = Column(Integer)
+    action_type = Column(String(50))
+    details = Column(Text)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+
+class DispatchLog(Base):
+    __tablename__ = "dispatch_log"
+
+    id = Column(Integer, primary_key=True)
+    complaint_id = Column(String(50))
+    channel = Column(String(20), nullable=False)
+    recipient = Column(Text, nullable=False)
+    dispatched_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    delivery_status = Column(String(20))
+    raw_response = Column(Text)
+
+
+class RegistryProvenance(Base):
+    __tablename__ = "registry_provenance"
+
+    id = Column(Integer, primary_key=True)
+    account_hash = Column(Text, nullable=False)
+    tx_hash = Column(Text)
+    flagging_authority = Column(Text)
+    flag_basis = Column(String(30))
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+
+class WithdrawalHistory(Base):
+    __tablename__ = "withdrawal_history"
+
+    id = Column(Integer, primary_key=True)
+    complaint_id = Column(String(50))
+    atm_id = Column(String(50))
+    withdrawal_lat = Column(Float)
+    withdrawal_lon = Column(Float)
+    withdrawal_time = Column(TIMESTAMP)
+    cashout_channel = Column(String(50))
+    created_at = Column(TIMESTAMP, server_default=func.now())

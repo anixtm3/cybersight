@@ -1,3 +1,4 @@
+from app.routers import complaints, predict, auth, ingest, heatmap, websocket, reports, mule, evidence
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -134,15 +135,14 @@ def root():
 def health():
     return {"status": "ok"}
 
-
 @app.get("/health/db")
 def health_db():
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return {"database": "connected"}
-    except Exception as exc:
-        return {"database": "error", "detail": str(exc)}
+    except Exception:
+        return {"database": "error", "detail": "database unreachable"}
 
 
 # ✅ DASHBOARD STATS

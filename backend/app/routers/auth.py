@@ -20,9 +20,9 @@ ALGORITHM = "HS256"
 EXPIRE_HOURS = 8
 
 
-def create_token(data: dict):
+def create_token(data: dict, role: str = "admin"):
     expire = datetime.utcnow() + timedelta(hours=EXPIRE_HOURS)
-    data.update({"exp": expire, "role": "admin"})
+    data.update({"exp": expire, "role": role})
     return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -48,7 +48,7 @@ def login(login_data: LoginRequest, request: Request, db: Session = Depends(get_
             detail="Invalid credentials"
         )
 
-    token = create_token({"sub": user.username})
+    token = create_token({"sub": user.username}, role=user.role)
 
     audit = AuditLog(
         log_id=uuid.uuid4(),
@@ -61,7 +61,7 @@ def login(login_data: LoginRequest, request: Request, db: Session = Depends(get_
     db.add(audit)
     db.commit()
 
-    return LoginResponse(access_token=token)
+    return LoginResponse(access_token=token, role=user.role)
 
 
 @router.post("/logout")

@@ -144,6 +144,10 @@ def ingest_complaint(complaint_data: IngestRequest, request: Request, db: Sessio
     if complaint_data.fraud_type:
         fraud_type = complaint_data.fraud_type
 
+    # fraud_type column is NOT NULL in schema — never pass None
+    if not fraud_type:
+        fraud_type = "Unclassified"
+
     # 4. Complaint DB mein save karo
     complaint = Complaint(
         complaint_id=complaint_data.complaint_id,
