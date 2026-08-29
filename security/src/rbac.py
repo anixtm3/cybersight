@@ -21,6 +21,17 @@ def get_current_user(authorization: str = Header(...)):
         raise HTTPException(status_code=401, detail="Invalid or missing token")
 
 
+def get_current_user_from_token(token: str) -> dict:
+    """
+    Decode and validate a raw JWT string directly (no Header dependency).
+    Used for WebSocket authentication where the token arrives in the
+    first message body instead of an Authorization header.
+    Raises an exception on invalid/expired token.
+    """
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    return payload
+
+
 def require_role(required_role: str):
     def checker(user: dict = Depends(get_current_user)):
         if user.get("role") != required_role:

@@ -195,3 +195,73 @@ def test_jurisdiction_admin_bypasses_check():
     token = create_token("admin2", "admin")
     response = tc.get("/district-data", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
+
+
+def test_ws_auth_valid_token():
+    from fastapi import FastAPI, WebSocket
+    from fastapi.testclient import TestClient as TC
+    from ws_auth import authenticate_websocket
+
+    test_app = FastAPI()
+
+    @test_app.websocket("/ws/test-alerts")
+    async def ws_endpoint(websocket: WebSocket):
+        user = await authenticate_websocket(websocket)
+        if user:
+            await websocket.send_json({"status": "authenticated", "user": user["sub"]})
+            await websocket.close()
+
+    tc = TC(test_app)
+    token = create_token("officer1", "cyber_cell_officer", jurisdiction="Delhi")
+
+    with tc.websocket_connect("/ws/test-alerts") as ws:
+        ws.send_json({"token": token})
+        response = ws.receive_json()
+        assert response["status"] == "authenticated"
+        assert response["user"] == "officer1"
+
+
+def test_ws_auth_missing_token():
+    from fastapi import FastAPI, WebSocket
+    from fastapi.testclient import TestClient as TC
+    from starlette.websockets import WebSocketDisconnect
+    from ws_auth import authenticate_websocket
+
+    test_app = FastAPI()
+
+    @test_app.websocket("/ws/test-alerts-missing")
+    async def ws_endpoint(websocket: WebSocket):
+        user = await authenticate_websocket(websocket)
+
+    tc = TC(test_app)
+
+    with tc.websocket_connect("/ws/test-alerts-missing") as ws:
+        ws.send_json({"not_a_token": "oops"})
+        try:
+            ws.receive_json()
+            assert False, "Expected connection to close"
+        except WebSocketDisconnect as e:
+            assert e.code == 4001
+
+
+def test_ws_auth_invalid_token():
+    from fastapi import FastAPI, WebSocket
+    from fastapi.testclient import TestClient as TC
+    from starlette.websockets import WebSocketDisconnect
+    from ws_auth import authenticate_websocket
+
+    test_app = FastAPI()
+
+    @test_app.websocket("/ws/test-alerts-invalid")
+    async def ws_endpoint(websocket: WebSocket):
+        user = await authenticate_websocket(websocket)
+
+    tc = TC(test_app)
+
+    with tc.websocket_connect("/ws/test-alerts-invalid") as ws:
+        ws.send_json({"token": "this.is.not.a.valid.jwt"})
+        try:
+            ws.receive_json()
+            assert False, "Expected connection to close"
+        except WebSocketDisconnect as e:
+            assert e.code == 4001
