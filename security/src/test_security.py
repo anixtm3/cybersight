@@ -137,3 +137,9 @@ def test_trigger_alert_requires_admin_role():
     )
     assert admin_response.status_code == 200
     assert len(admin_response.json()["dispatched"]) == 2
+
+def test_login_rate_limit_returns_429():
+    for i in range(5):
+        client.post("/login?username=test&password=wrong")
+    response = client.post("/login?username=test&password=wrong")
+    assert response.status_code == 429
