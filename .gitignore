@@ -5,3 +5,4 @@ ml/data/*.csv
 __pycache__/
 *.pyc
 .DS_Store
+ml\day_2_dump.sql

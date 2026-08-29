@@ -1,0 +1,62 @@
+[
+  {
+    "feature": "victim_lat",
+    "shap_impact_lat": 3.2612,
+    "shap_impact_lon": -0.0283,
+    "combined_importance": 3.2895
+  },
+  {
+    "feature": "victim_district_enc",
+    "shap_impact_lat": 1.773,
+    "shap_impact_lon": 0.2979,
+    "combined_importance": 2.0709
+  },
+  {
+    "feature": "beneficiary_bank_enc",
+    "shap_impact_lat": -0.8677,
+    "shap_impact_lon": 0.7935,
+    "combined_importance": 1.6612
+  },
+  {
+    "feature": "victim_lon",
+    "shap_impact_lat": -0.1163,
+    "shap_impact_lon": -0.955,
+    "combined_importance": 1.0713
+  },
+  {
+    "feature": "number_of_hops",
+    "shap_impact_lat": -0.2811,
+    "shap_impact_lon": 0.2066,
+    "combined_importance": 0.4877
+  },
+  {
+    "feature": "amount_lost",
+    "shap_impact_lat": -0.1388,
+    "shap_impact_lon": 0.063,
+    "combined_importance": 0.2018
+  },
+  {
+    "feature": "is_insider_case_enc",
+    "shap_impact_lat": -0.0247,
+    "shap_impact_lon": 0.0215,
+    "combined_importance": 0.0462
+  },
+  {
+    "feature": "fraud_type_enc",
+    "shap_impact_lat": -0.0117,
+    "shap_impact_lon": -0.013,
+    "combined_importance": 0.0248
+  },
+  {
+    "feature": "is_weekend_enc",
+    "shap_impact_lat": 0.0003,
+    "shap_impact_lon": 0.0167,
+    "combined_importance": 0.017
+  },
+  {
+    "feature": "hour",
+    "shap_impact_lat": 0.004,
+    "shap_impact_lon": 0.0032,
+    "combined_importance": 0.0072
+  }
+]
