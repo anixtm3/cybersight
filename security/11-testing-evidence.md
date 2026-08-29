@@ -172,3 +172,23 @@ as-is with Kartike's real JWT structure.
 This confirms the security module's RBAC and jurisdiction logic is
 compatible with the actual backend contract, not just the mock
 environment used for earlier tests.
+
+
+### Test 10 - WebSocket Authentication (/ws/alerts)
+
+Implemented per Kartike's confirmed contract: JWT-gated (not public),
+token sent in the first message after connect (not query param, to
+avoid token leaking into server/tunnel logs), invalid/expired/missing
+token results in socket close with code 4001 and a reason string.
+
+Three scenarios tested:
+
+- Valid token: connection succeeds, authenticated user data returned
+- Missing token in first message: connection closed with code 4001
+- Invalid/malformed token: connection closed with code 4001
+
+Total automated test count: 22 (all passing).
+
+Code: security/src/ws_auth.py (authenticate_websocket function),
+using rbac.get_current_user_from_token() for token validation
+outside the HTTP Header dependency context.

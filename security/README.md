@@ -35,7 +35,7 @@ successfully against Kartike's live backend.
 | 08-rate-limiting-api-abuse-protection.md | Rate limiting and API abuse protection |
 | 09-pii-protection-data-privacy.md | PII masking and data minimization |
 | 10-audit-logging-security-events.md | Audit logging and security event tracking |
-| 11-testing-evidence.md | Independent and live-backend testing evidence (19 pytest tests + real integration test) |
+| 11-testing-evidence.md | Independent and live-backend testing evidence (22 pytest tests + real integration test) |
 
 ## Code
 
@@ -49,8 +49,9 @@ successfully against Kartike's live backend.
 | src/alert_dispatch.py | Multi-channel alert dispatch (SMS, email, webhook), wired to dispatch_log DB |
 | src/dispatch_db.py | Database layer matching Kartike's confirmed dispatch_log schema |
 | src/mock_app.py | Standalone FastAPI app - login, RBAC routes, evidence log, alert trigger |
+| src/ws_auth.py | WebSocket authentication for /ws/alerts (JWT-gated, first-message auth) |
 | src/evidence_ui.html | Standalone evidence documentation UI (local prototype, no backend yet) |
-| src/test_security.py | Automated pytest suite (19 tests) for all security modules |
+| src/test_security.py | Automated pytest suite (22 tests) for all security modules |
 | requirements.txt | Python dependencies for the security module |
 
 ## Testing
@@ -60,9 +61,10 @@ Run the automated test suite:
     cd security/src
     pytest test_security.py -v
 
-19 tests covering PII masking, password security, RBAC, jurisdiction
-scoping, alert dispatch, dispatch log DB writes, and evidence
-log/alert-trigger endpoint authorization. All passing as of last run.
+22 tests covering PII masking, password security, RBAC, jurisdiction
+scoping, alert dispatch, dispatch log DB writes, WebSocket
+authentication, and evidence log/alert-trigger endpoint
+authorization. All passing as of last run.
 
 ## Confirmed Backend Contract (from Kartike)
 
@@ -77,16 +79,19 @@ log/alert-trigger endpoint authorization. All passing as of last run.
 
 - Production DB wiring - swap SQLite connection for the real
   Postgres dispatch_log table once backend access is available.
-- Alert Dispatch and WebSocket Security (4th channel, /ws/alerts) -
-  on hold, awaiting confirmation from Kartike on the authentication
-  approach.
+- Merge alert_dispatch.py, dispatch_db.py, rbac.py, and ws_auth.py
+  into main branch - Kartike needs the real dispatcher code (his
+  ingest.py currently has a placeholder). Awaiting confirmation on
+  merge process (PR vs direct push).
 - PII masking - decision confirmed: complaints.py masking used in
   production, pii_masking.py kept as standalone/backup module.
   Origin of complaints.py masking still unconfirmed by either
   Saina or Kartike, but this is non-blocking.
 - Evidence documentation UI is currently local-only (browser
-  localStorage); needs to be wired to the /evidence-log endpoint
-  once the real backend is available.
+  localStorage); needs to be wired to the real endpoints
+  (/api/complaints/{complaint_id}/notes and
+  /api/complaints/{complaint_id}/actions, confirmed by Kartike -
+  not /evidence-log as originally assumed).
 
 ## Dispatch Log DB
 
