@@ -1,0 +1,46 @@
+# ===========================
+# Python
+# ===========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Environment Variables
+.env
+
+# ===========================
+# Node.js
+# ===========================
+node_modules/
+npm-debug.log*
+
+# Hardhat
+cache/
+
+# ===========================
+# IDEs
+# ===========================
+.vscode/
+.idea/
+
+# ===========================
+# AI Tooling
+# ===========================
+.codex/
+.agents/
+
+# ===========================
+# Personal Workspace
+# ===========================
+.obsidian/
+
+# ===========================
+# OS Files
+# ===========================
+.DS_Store
+Thumbs.db
