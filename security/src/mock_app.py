@@ -8,8 +8,8 @@ from alert_dispatch import dispatch_alert
 app = FastAPI()
 
 FAKE_USERS = {
-    "investigator1": {"password": "pass123", "role": "investigator"},
-    "bankofficer1": {"password": "pass123", "role": "bank_officer"},
+    "officer1": {"password": "pass123", "role": "cyber_cell_officer"},
+    "bankofficer1": {"password": "pass123", "role": "bank_nodal_officer"},
     "admin1": {"password": "pass123", "role": "admin"},
 }
 
@@ -28,9 +28,9 @@ def login(request: Request, username: str, password: str):
     return {"access_token": token, "role": user["role"]}
 
 
-@app.get("/investigator-only")
-def investigator_route(user=Depends(require_role("investigator"))):
-    return {"message": f"Welcome investigator {user['sub']}"}
+@app.get("/cyber-cell-only")
+def cyber_cell_route(user=Depends(require_role("cyber_cell_officer"))):
+    return {"message": f"Welcome cyber cell officer {user['sub']}"}
 
 
 @app.get("/admin-only")
@@ -51,7 +51,7 @@ def add_evidence_entry(
     case_id: str,
     action_type: str,
     notes: str,
-    user=Depends(require_role("investigator")),
+    user=Depends(require_role("cyber_cell_officer")),
 ):
     entry = {
         "case_id": case_id,
@@ -68,7 +68,7 @@ def add_evidence_entry(
 
 
 @app.get("/evidence-log/{case_id}")
-def get_evidence_log(case_id: str, user=Depends(require_role("investigator"))):
+def get_evidence_log(case_id: str, user=Depends(require_role("cyber_cell_officer"))):
     matching = [e for e in EVIDENCE_LOG if e["case_id"] == case_id]
     return {"case_id": case_id, "entries": matching}
 

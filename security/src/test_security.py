@@ -53,7 +53,7 @@ def test_password_hash_and_verify():
 
 
 def test_rbac_token_roundtrip():
-    token = create_token("user1", "investigator")
+    token = create_token("user1", "cyber_cell_officer")
     assert isinstance(token, str)
     assert len(token) > 0
 
@@ -93,7 +93,7 @@ def _login(username, password="pass123"):
 
 
 def test_evidence_log_add_and_retrieve():
-    token = _login("investigator1")
+    token = _login("officer1")
     headers = {"Authorization": f"Bearer {token}"}
 
     add_response = client.post(
@@ -110,7 +110,7 @@ def test_evidence_log_add_and_retrieve():
     assert entries[-1]["case_id"] == "CS-TEST-001"
 
 
-def test_evidence_log_requires_investigator_role():
+def test_evidence_log_requires_cyber_cell_role():
     token = _login("admin1")
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -122,14 +122,14 @@ def test_evidence_log_requires_investigator_role():
 
 
 def test_trigger_alert_requires_admin_role():
-    investigator_token = _login("investigator1")
+    officer_token = _login("officer1")
     admin_token = _login("admin1")
 
-    inv_response = client.post(
+    officer_response = client.post(
         "/trigger-alert?zone=Test-Zone&risk_level=HIGH",
-        headers={"Authorization": f"Bearer {investigator_token}"},
+        headers={"Authorization": f"Bearer {officer_token}"},
     )
-    assert inv_response.status_code == 403
+    assert officer_response.status_code == 403
 
     admin_response = client.post(
         "/trigger-alert?zone=Test-Zone&risk_level=HIGH",
@@ -138,8 +138,60 @@ def test_trigger_alert_requires_admin_role():
     assert admin_response.status_code == 200
     assert len(admin_response.json()["dispatched"]) == 2
 
+
 def test_login_rate_limit_returns_429():
     for i in range(5):
         client.post("/login?username=test&password=wrong")
     response = client.post("/login?username=test&password=wrong")
     assert response.status_code == 429
+
+
+def test_jurisdiction_same_district_allowed():
+    from rbac import require_jurisdiction, create_token
+    from fastapi import FastAPI, Depends
+    from fastapi.testclient import TestClient as TC
+
+    test_app = FastAPI()
+
+    @test_app.get("/district-data")
+    def district_data(user=Depends(require_jurisdiction("Delhi"))):
+        return {"message": "access granted"}
+
+    tc = TC(test_app)
+    token = create_token("officer2", "cyber_cell_officer", jurisdiction="Delhi")
+    response = tc.get("/district-data", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+
+
+def test_jurisdiction_different_district_denied():
+    from rbac import require_jurisdiction, create_token
+    from fastapi import FastAPI, Depends
+    from fastapi.testclient import TestClient as TC
+
+    test_app = FastAPI()
+
+    @test_app.get("/district-data")
+    def district_data(user=Depends(require_jurisdiction("Mumbai"))):
+        return {"message": "access granted"}
+
+    tc = TC(test_app)
+    token = create_token("officer2", "cyber_cell_officer", jurisdiction="Delhi")
+    response = tc.get("/district-data", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 403
+
+
+def test_jurisdiction_admin_bypasses_check():
+    from rbac import require_jurisdiction, create_token
+    from fastapi import FastAPI, Depends
+    from fastapi.testclient import TestClient as TC
+
+    test_app = FastAPI()
+
+    @test_app.get("/district-data")
+    def district_data(user=Depends(require_jurisdiction("Mumbai"))):
+        return {"message": "access granted"}
+
+    tc = TC(test_app)
+    token = create_token("admin2", "admin")
+    response = tc.get("/district-data", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200

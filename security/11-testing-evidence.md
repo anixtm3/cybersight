@@ -97,3 +97,24 @@ Three additional endpoint tests added to the automated suite:
   to 2 channels
 
 Total automated test count: 15 (all passing).
+
+
+### Test 6 - Role Sync with Confirmed Backend Contract
+
+Roles updated to match confirmed backend contract from Kartike:
+admin, cyber_cell_officer, bank_nodal_officer (previously used
+placeholder names: investigator, bank_officer, admin).
+
+### Test 7 - Jurisdiction-Scoped Authorization
+
+Added `require_jurisdiction()` dependency in rbac.py, ready for the
+`jurisdiction` JWT claim once added by the backend team. Three
+scenarios tested:
+
+- Same-district access: user jurisdiction matches resource
+  jurisdiction -> 200 OK
+- Cross-district access: user jurisdiction does not match resource
+  jurisdiction -> 403 Forbidden
+- Admin bypass: admin role skips jurisdiction check entirely -> 200 OK
+
+Total automated test count: 19 (all passing).
