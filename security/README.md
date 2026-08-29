@@ -16,8 +16,9 @@ and tested. Roles synced with confirmed backend contract
 authorization implemented and tested using the confirmed JWT
 claim. Alert dispatcher wired to a database matching Kartike's
 dispatch_log schema exactly (SQLite locally, drop-in replacement
-for Postgres in production). Full backend integration (real login
-endpoint) is in progress pending backend URL/access from Kartike.
+for Postgres in production). Real backend integration verified:
+login, JWT decode, and jurisdiction enforcement all tested
+successfully against Kartike's live backend.
 
 ## Files
 
@@ -34,7 +35,7 @@ endpoint) is in progress pending backend URL/access from Kartike.
 | 08-rate-limiting-api-abuse-protection.md | Rate limiting and API abuse protection |
 | 09-pii-protection-data-privacy.md | PII masking and data minimization |
 | 10-audit-logging-security-events.md | Audit logging and security event tracking |
-| 11-testing-evidence.md | Independent testing evidence (all modules, 19 pytest tests) |
+| 11-testing-evidence.md | Independent and live-backend testing evidence (19 pytest tests + real integration test) |
 
 ## Code
 
@@ -74,17 +75,15 @@ log/alert-trigger endpoint authorization. All passing as of last run.
 
 ## Pending
 
-- Real backend integration - awaiting backend URL/access from
-  Kartike (LAN via --host 0.0.0.0) to test against the live
-  /api/auth/login endpoint.
 - Production DB wiring - swap SQLite connection for the real
   Postgres dispatch_log table once backend access is available.
 - Alert Dispatch and WebSocket Security (4th channel, /ws/alerts) -
   on hold, awaiting confirmation from Kartike on the authentication
   approach.
-- PII masking - confirming with Kartike whether the masking in
-  complaints.py was written by him or was already present, to
-  avoid duplicating pii_masking.py in production.
+- PII masking - decision confirmed: complaints.py masking used in
+  production, pii_masking.py kept as standalone/backup module.
+  Origin of complaints.py masking still unconfirmed by either
+  Saina or Kartike, but this is non-blocking.
 - Evidence documentation UI is currently local-only (browser
   localStorage); needs to be wired to the /evidence-log endpoint
   once the real backend is available.

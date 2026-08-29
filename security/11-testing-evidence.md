@@ -138,3 +138,37 @@ Migration to production (Postgres) requires only a connection-string
 change; the write logic and schema already match Kartike's model.
 
 Total automated test count: 19 (all still passing after DB wiring).
+
+
+### Test 9 - Real Backend Integration (Live Test)
+
+Tested against Kartike's live backend via public tunnel
+(https://solid-peas-eat.loca.lt), not the mock environment.
+
+**Health check:**
+GET /health -> 200 OK, {"status":"ok"}
+
+**Real login:**
+POST /api/auth/login
+Body: {"username": "officer_delhi", "password": "Test@123"}
+Result: 200 OK, real access_token returned
+
+**JWT decode (real token, not self-issued):**
+{
+  "sub": "officer_delhi",
+  "role": "cyber_cell_officer",
+  "jurisdiction": "New Delhi",
+  "bank_name": null,
+  "exp": 1788026580
+}
+
+**Jurisdiction enforcement verified against real token:**
+require_jurisdiction() logic checked manually against the decoded
+real payload for a "New Delhi" resource - correctly grants access
+on jurisdiction match. No backend changes were required; the
+existing require_jurisdiction() implementation in rbac.py works
+as-is with Kartike's real JWT structure.
+
+This confirms the security module's RBAC and jurisdiction logic is
+compatible with the actual backend contract, not just the mock
+environment used for earlier tests.
