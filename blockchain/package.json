@@ -1,0 +1,30 @@
+{
+  "name": "blockchain",
+  "version": "1.0.0",
+  "description": "CyberSight Blockchain Module",
+  "main": "index.js",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "deploy": "python deploy.py",
+    "test-contract": "npx hardhat run scripts/testContract.js --network ganache",
+    "setup": "npm run compile && python deploy.py && npm run test-contract"
+  },
+  "keywords": [
+    "blockchain",
+    "ethereum",
+    "hardhat",
+    "ganache",
+    "cybersight",
+    "sih"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.19"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
+  }
+}

@@ -1,0 +1,57 @@
+# ===========================
+# Python
+# ===========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Environment Variables / Secrets
+.env
+.env.*
+!.env.example
+
+# ===========================
+# Node.js
+# ===========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===========================
+# Hardhat
+# ===========================
+cache/
+
+# Generated Hardhat metadata
+artifacts/build-info/
+artifacts/contracts/**/*.dbg.json
+
+
+# ===========================
+# IDEs
+# ===========================
+.vscode/
+.idea/
+
+# ===========================
+# AI Tooling
+# ===========================
+.codex/
+.agents/
+
+# ===========================
+# Personal Workspace
+# ===========================
+.obsidian/
+
+# ===========================
+# OS Files
+# ===========================
+.DS_Store
+Thumbs.db
