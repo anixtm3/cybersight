@@ -1,158 +1,101 @@
+# CyberSight — Database (Saina)
 
-**Port:** 5433 (non-default — update all connection strings accordingly)
-
----
-
-## Setup Steps
-
-### 1. Create Database
-```sql
-CREATE DATABASE cybersight;
-\c cybersight
-CREATE EXTENSION postgis;
-CREATE EXTENSION pgcrypto;
-```
-
-### 2. Run Schema
-```sql
-\i database/schema.sql
-```
-
-### 3. Insert ATM Data (run in this order)
-```bash
-python database/insert_atms.py
-python database/insert_atms_ncr.py
-python database/insert_atms_mumbai.py
-python database/insert_jamtara_atms.py
-python database/insert_atms_bengaluru.py
-python database/insert_atms_hyderabad.py
-python database/insert_atms_agra.py
-python database/insert_atms_patna.py
-python database/insert_atms_pune.py
-python database/insert_atms_lucknow.py
-```
-
-### 4. Generate Synthetic Complaints
-```bash
-python database/generate_data.py
-```
+**Branch:** `saina`  
+**Stack:** PostgreSQL 15 + PostGIS 3.6.2, port 5433, database: `cybersight`
 
 ---
 
-## ATM Coverage — 10 Districts
+## What I Built
 
-| District | State | ATMs | Source |
-|----------|-------|------|--------|
-| Bengaluru | Karnataka | 1,137 | OSM/Overpass |
-| Delhi NCR | Haryana | 869 | OSM/Overpass |
-| Delhi | Delhi | 797 | OSM/Overpass |
-| Hyderabad | Telangana | 566 | OSM/Overpass |
-| Pune | Maharashtra | 457 | OSM/Overpass |
-| Mumbai | Maharashtra | 300 | OSM/Overpass |
-| Jamtara | Jharkhand | 300 | Synthetic* |
-| Patna | Bihar | 89 | OSM/Overpass |
-| Lucknow | Uttar Pradesh | 57 | OSM/Overpass |
-| Agra | Uttar Pradesh | 53 | OSM/Overpass |
-| **Total** | | **4,625** | |
+### 1. Schema (`database/schema.sql`)
 
-*Jamtara: OSM data unavailable. Synthetic coordinates within correct bounding box (23.8–24.2°N, 86.8–87.2°E).
-
----
-
-## Synthetic Dataset
-
-| Stat | Value |
-|------|-------|
-| Total rows | ~419,863 |
-| Year | 2024 |
-| Districts | 10 |
-| Unique target ATMs | 2,593 |
-| Insider cases | 5% |
-| Festival period rows | ~27,000 |
-
-### ML Features Generated
-
-| Feature | Description |
-|---------|-------------|
-| `fraud_type` | 8 types (UPI, OLX, Investment, Romance, KYC, Job, Lottery, Tech Support) |
-| `amount_lost` | Log-normal per fraud type |
-| `number_of_hops` | Correlated with amount |
-| `victim_lat/lon` | Within district bounding box |
-| `withdrawal_lat/lon` | Displaced by fraud pattern |
-| `target_atm_id` | PostGIS nearest ATM to withdrawal point |
-| `is_festival_period` | 20 Indian festivals 2024 |
-| `hour_of_day_sin/cos` | Cyclical time encoding |
-| `day_of_week` | 0=Monday to 6=Sunday |
-| `is_weekend` | Boolean |
-| `account_age_days` | Correlated with fraud type |
-| `mule_network_flag` | Probability increases with hop count |
-| `rolling_6h_complaint_count` | Same district, last 6 hours |
-| `district_risk_score` | Normalized complaint density per district |
-| `atm_density` | ATMs within 5km of withdrawal point |
-| `time_since_last_complaint_same_bank` | Hours since last same-bank complaint |
-| `victim_to_withdrawal_distance_km` | Euclidean displacement |
-| `is_insider_case` | 5% cases, withdrawal 2-5km from victim |
-
-**Data statement:** Synthetic dataset designed from NCRB/I4C published fraud typologies. No real PII or case data. Production deployment requires retraining on authorised I4C data under MoU.
-
----
-
-## Schema — Key Tables
+**Tables:**
 
 | Table | Purpose |
 |-------|---------|
-| `complaints` | Core complaint data + all ML features |
-| `atm_locations` | 4,625 ATMs with PostGIS geometry |
-| `predictions` | Model output per complaint |
-| `alerts` | Alert records |
-| `alert_dispatch_log` | Multi-channel dispatch audit |
-| `users` | 3-role RBAC |
-| `mule_accounts` | Mule account registry |
-| `registry_provenance` | Blockchain evidence |
-| `case_notes` | Investigator evidence documentation |
-| `action_log` | Officer action tracking |
-| `dispatch_log` | Alert channel log |
-| `revoked_tokens` | JWT revocation |
-| `audit_log` | Admin audit trail |
+| `users` | Auth — 3 roles, jurisdiction scoping, bank scoping |
+| `complaints` | Core complaint records — 28 ML features populated |
+| `atm_locations` | 4,625 real ATMs with PostGIS geometry |
+| `predictions` | ML output — Top 5 ATMs, SHAP, confidence, risk level |
+| `dispatch_log` | 4-channel alert delivery records |
+| `mule_accounts` | Flagged beneficiary accounts |
+| `case_notes` | Investigator notes per complaint |
+| `action_log` | Officer actions per complaint — includes `details TEXT` for CCTV notes |
+| `audit_log` | System-wide sensitive action audit trail |
+| `keyword_fraud_map` | Keyword → fraud type mapping |
+| `registry_provenance` | Blockchain provenance — columns: `id, created_at, account_hash, tx_hash, flagging_authority, flag_basis` |
+
+**Key schema decisions:**
+
+- `users.jurisdiction_district` — enforces district-scoped data access for `cyber_cell_officer`
+- `users.bank_name` — enforces bank-scoped access for `bank_nodal_officer`
+- 3-role CHECK constraint: `cyber_cell_officer`, `bank_nodal_officer`, `admin`
+- `complaints.tracking_number` — format `CS-2026-XXXXXXX` (7 digits, LPAD)
+- `atm_locations.location` — PostGIS `GEOGRAPHY(POINT, 4326)` with GIST index for fast radius queries
+- `audit_log.log_id` — no `server_default`, must be supplied explicitly on insert
+
+### 2. ATM Data (`database/atm_inserts/`)
+
+Real ATM coordinates sourced via Overpass Turbo (OpenStreetMap):
+
+| District | ATMs |
+|----------|------|
+| Bengaluru | 1,137 |
+| Delhi NCR | 869 |
+| Delhi | 797 |
+| Hyderabad | 566 |
+| Pune | 457 |
+| Mumbai | 300 |
+| Jamtara | 300 (synthetic — correct bounding box 23.8–24.2°N, 86.8–87.2°E) |
+| Patna | 89 |
+| Lucknow | 57 |
+| Agra | 53 |
+| **Total** | **4,625** |
+
+### 3. Synthetic Data (`ML/generate_data.py`)
+
+419,863 complaint rows — all 28 ML features populated, `target_atm_id` nulls: 0.
+
+**Key fixes applied during generation:**
+- `np.float64` cast to `float()` before PostGIS queries — prevents silent failures
+- `conn.autocommit = True` — prevents rollback on large batches
+- Tracking number sequence: LPAD 7 digits, restarted at 100001 for second run
+- Split into two runs: 99,999 rows + 400,001 rows (`start_index=100000`)
+- ANOVA fix: removed hardcoded `preferred_bearing` from `BANK_CONFIG` — replaced with randomized logic (was creating artificial ML signal, p ~10⁻⁷⁵)
 
 ---
 
-## Key Schema Details
+## Verified
 
-### Roles
-```sql
-CHECK (role IN ('admin', 'cyber_cell_officer', 'bank_nodal_officer'))
+- Schema runs cleanly on fresh DB — zero errors ✅
+- PostGIS 5km radius query — returns correct ATM counts ✅
+- Foreign key integrity — enforced ✅
+- 419,863 complaints — `target_atm_id` nulls: 0 ✅
+- All 28 ML features populated ✅
+- 10 districts, 4,625 ATMs ✅
+
+---
+
+## Setup
+
+```bash
+# Create DB
+psql -h localhost -p 5433 -U postgres -c "CREATE DATABASE cybersight;"
+
+# Enable extensions
+psql -h localhost -p 5433 -U postgres -d cybersight -c "CREATE EXTENSION postgis; CREATE EXTENSION pgcrypto;"
+
+# Run schema
+psql -h localhost -p 5433 -U postgres -d cybersight -f database/schema.sql
+
+# Insert ATM data
+psql -h localhost -p 5433 -U postgres -d cybersight -f database/atm_inserts/all_cities.sql
 ```
 
-### Tracking Number Format
-`CS-2026-XXXXXXX` — 7 digits, auto-generated via trigger on INSERT.
-
-### JWT vs DB Field
-- JWT payload: `jurisdiction`
-- DB column: `jurisdiction_district`
-- Intentionally different — do not change either.
-
----
-
-## Integration Notes
-
-| Item | Detail |
-|------|--------|
-| Port | 5433 (not default 5432) |
-| PostGIS | Required — `ST_DWithin`, `<->` operator used |
-| np.float64 | Always cast to `float()` before PostGIS queries |
-| district_risk_score | Pre-computed in complaints table — fetch via AVG per district |
-| atm_density | Compute real-time via PostGIS 5km radius query |
-| time_since_last_complaint_same_bank | Compute real-time from complaints table, default -1 if none |
-| account_age_days | Default 180 for demo |
-| mule_network_flag | Derive: 1 if number_of_hops >= 4, else 0 |
-
----
-
-## ML Model
-
-See `ML/` branch (`saina-ml`) for training code and model.pkl.
-
-- **Approach:** XGBoost district classifier → PostGIS Top 5 ATM ranking
-- **Top-1 Accuracy:** 90%
-- **Top-5 Accuracy:** 100%
+**Demo users** — insert once:
+```sql
+INSERT INTO users (username, password_hash, role, jurisdiction_district, bank_name) VALUES
+('cyber_delhi', '<bcrypt hash>', 'cyber_cell_officer', 'Delhi', NULL),
+('i4c_admin',  '<bcrypt hash>', 'admin', NULL, NULL),
+('bank_sbi',   '<bcrypt hash>', 'bank_nodal_officer', NULL, 'SBI');
+```
