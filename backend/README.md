@@ -1,384 +1,134 @@
-# CyberSight — Backend API
+# CyberSight — Backend (Kartike)
 
-> FastAPI-powered REST backend for CyberSight (Smart India Hackathon 2025 – PS 77)
-
----
-
-# Overview
-
-The Backend API is a core component of **CyberSight**, a predictive analytics framework developed for **Smart India Hackathon 2025 (PS 77)** under the **Ministry of Home Affairs (MHA)** and the **Indian Cybercrime Coordination Centre (I4C)**.
-
-This module handles complaint ingestion, keyword detection, ML prediction routing, alert dispatch, WebSocket broadcasting, heatmap generation, report generation, JWT authentication, token revocation, audit logging, PII masking, and SQL injection validation using **FastAPI**, **SQLAlchemy**, and **PostgreSQL with PostGIS**.
+**Branch:** `kartike`  
+**Stack:** FastAPI (Python 3.11), PostgreSQL 15 + PostGIS, XGBoost, SQLAlchemy, SlowAPI
 
 ---
 
-# Development Status
+## What I Built
 
-## Day 1 Integration: Complete ✅
+### 1. Auth & RBAC (`app/routers/auth.py`, `app/auth_core.py`)
+- JWT login endpoint — `/api/auth/login`
+- Three roles enforced: `cyber_cell_officer`, `bank_nodal_officer`, `admin`
+- Jurisdiction scoping — cyber cell officers can only see complaints from their own district
+- Token revocation check on every request via middleware
+- Rate limiting — 429 after 5 rapid failed login attempts
 
-### Implemented Features
+### 2. Complaint Ingest Pipeline (`app/routers/ingest.py`)
+- `POST /api/complaints/ingest` — full end-to-end pipeline:
+  - Input validation (null bytes, length limits)
+  - Keyword-based fraud type detection
+  - Duplicate complaint ID check
+  - Complaint saved to DB
+  - 6 real-time features computed (rolling 6h count, district risk score, ATM density via PostGIS, time since last complaint same bank, mule flag, festival period)
+  - XGBoost prediction called → Top 5 ATMs returned
+  - Prediction record saved with SHAP values, confidence, freezable amount
+  - Dispatch log written for MEDIUM/HIGH alerts
+  - Blockchain flag triggered for HIGH alerts (non-blocking, timeout-bounded)
+  - WebSocket broadcast for MEDIUM/HIGH alerts
+  - Failure paths hardened — orphan rows marked `prediction_failed`, no raw tracebacks exposed to client
 
-- [x] FastAPI project setup and folder structure
-- [x] GitHub repo and branch setup
-- [x] PostgreSQL connection via SQLAlchemy
-- [x] Saina DB schema integration (fraud_type, tracking_number, alert_level, PostGIS)
-- [x] POST /complaint — basic complaint creation
-- [x] GET /complaints — list complaints with filters (alert_level, fraud_type) + PII masked
-- [x] GET /complaints/{complaint_id} — fetch single complaint
-- [x] GET /api/complaints/{complaint_id}/full — full detail with prediction, recovery, mule (X-Admin-Confirm required)
-- [x] POST /api/complaints/ingest — keyword detection, SQL validation, tracking number, real ML predict(), alert dispatch
-- [x] POST /api/auth/login — JWT token, single admin role, 8hr expiry, audit logged
-- [x] POST /api/auth/logout — token revocation via SHA256 hash
-- [x] JWT revocation middleware — all protected routes checked
-- [x] Audit log — login success/failure logged to audit_log table
-- [x] PII masking — mobile_number + beneficiary_account masked on GET /complaints
-- [x] SQL injection validation — complaint_text, district, state validated on ingest
-- [x] X-Admin-Confirm header — GET /api/complaints/{id}/full protected
-- [x] GET /api/heatmap — GeoJSON with ATM risk layer + victim cluster layer
-- [x] GET /api/mule-accounts — mule account list with blockchain status
-- [x] GET /api/reports/case/{complaint_id} — individual case report
-- [x] GET /api/reports/daily — daily consolidated report
-- [x] WebSocket /ws/alerts — live alert broadcast for MEDIUM/HIGH complaints
-- [x] Alert dispatch logic — LOW = DB only, MEDIUM/HIGH = WebSocket + alert_dispatch_log
-- [x] Keyword → fraud_type detection via keyword_fraud_map table
-- [x] Tracking number auto-generation (CS-YYYY-XXXXX format via DB trigger)
-- [x] **Real ML model wired — cybersight_model.pkl (Rishika) live in predict()** ✅
-- [x] **Blockchain httpx integration — NON-BLOCKING flag call on HIGH alert (Aniket)** ✅
-- [x] **CORS middleware — http://localhost:5173 allowed (for Himanshu frontend)** ✅
-- [x] **SlowAPI rate limiting — login 5/15min, ingest 100/hr (Kanav)** ✅
-- [x] **GET /api/dashboard/stats — real DB query, live numbers** ✅
-- [x] **Admin user inserted — admin@cybersight.in / CyberSight@2025** ✅
-- [x] GET /health — server health check
-- [x] GET /health/db — database connection check
-- [x] Swagger UI at /docs
-- [x] Environment variable setup via dotenv
+### 3. ML Integration (`app/models/predict.py`)
+- Loads `ML/model.pkl` (XGBoost + encoders + ATM dataframe) once at startup
+- 19-feature input contract — exact order matches training
+- Confidence threshold gate — `< 0.4` → `ANALYST_REVIEW` suppresses auto-dispatch
+- SHAP values computed per prediction via `TreeExplainer`
+- Top 5 ATMs ranked from `atm_df` by predicted district
+- Freezable amount = `amount_lost * 0.6`
+- Safe encoder fallback — unseen labels return `0` instead of crashing
 
----
+### 4. Blockchain Integration (`app/routers/ingest.py`)
+- `flag_mule_on_blockchain()` — non-blocking POST to Aniket's service at `localhost:8001`
+- Hashing handled server-side by Aniket's Solidity contract (Keccak-256)
+- Graceful degrade — if Ganache is down, ingest still returns 200
 
-# Problem Statement
+### 5. WebSocket Alerts (`app/routers/websocket.py`)
+- `/ws/alerts` — live broadcast to connected clients
+- Broadcast triggered on every MEDIUM/HIGH ingest
+- Payload fields match Himanshu's frontend contract exactly
 
-Cybercriminals route stolen funds through multiple mule accounts and withdraw cash across ATMs before police can act.
+### 6. Evidence Module (`app/routers/evidence.py`)
+- `POST /api/complaints/{id}/notes` — case notes
+- `POST /api/complaints/{id}/actions` — action log
+- `GET` endpoints for both
+- Officer ID pulled from JWT, never from client
 
-CyberSight addresses this by:
+### 7. Reports & Export (`app/routers/reports.py`)
+- District-wise, bank-wise, fraud-typology-wise aggregates
+- CSV export — `?format=csv`
 
-- Ingesting NCRP complaints in real time
-- Detecting fraud keywords and mapping to fraud_type automatically
-- Calling ML model to predict exact ATM where cash will be withdrawn
-- Dispatching alerts to I4C, CyberCell, Bank, and PoliceSHO before withdrawal
-- Exposing heatmap, reports, and case detail endpoints for analyst dashboard
-- Securing all endpoints with JWT authentication and token revocation
-
----
-
-# Technology Stack
-
-| Component | Technology |
-|-----------|------------|
-| API Framework | FastAPI |
-| ASGI Server | Uvicorn |
-| ORM | SQLAlchemy |
-| Database | PostgreSQL 15+ |
-| Spatial Extension | PostGIS |
-| Schema Validation | Pydantic |
-| WebSocket | FastAPI WebSocket |
-| Auth (JWT) | python-jose + passlib |
-| Rate Limiting | SlowAPI |
-| Blockchain | httpx (non-blocking call to Aniket's API) |
-| ML Model | XGBoost + joblib (Rishika's cybersight_model.pkl) |
-| ML Libraries | pandas, numpy, shap |
-| Environment | python-dotenv |
-| Runtime | Python 3.10+ |
+### 8. Heatmap Endpoint (`app/routers/heatmap.py`)
+- GeoJSON response with filterable parameters — date range, district, fraud type, risk level
 
 ---
 
-# Project Structure
-backend/
+## Verified End-to-End
 
-│
-
-├── requirements.txt
-
-├── .env.example
-
-├── .env                        # NEVER commit
-
-├── .gitignore
-
-│
-
-└── app/
-
-├── main.py                 # FastAPI entry — JWT middleware, routers, health, CORS
-
-├── database.py             # PostgreSQL engine + session
-
-├── rate_limit.py           # SlowAPI limiter (shared across routers)
-
-│
-
-├── models/
-
-│   ├── init.py
-
-│   ├── complaint.py        # All SQLAlchemy models
-
-│   ├── predict.py          # Rishika's real ML predict() function
-
-│   ├── cybersight_model.pkl # Trained XGBoost model
-
-│   └── atm_locations.csv   # ATM data for ML prediction
-
-│
-
-├── schemas/
-
-│   ├── init.py
-
-│   └── complaint.py        # Pydantic schemas — request/response validation
-
-│
-
-└── routers/
-
-├── init.py
-
-├── complaints.py       # GET /complaints, GET /full
-
-├── predict.py          # GET /predict
-
-├── auth.py             # POST /api/auth/login + /logout (rate limited)
-
-├── ingest.py           # POST /api/complaints/ingest (ML + blockchain + rate limited)
-
-├── heatmap.py          # GET /api/heatmap
-
-├── mule.py             # GET /api/mule-accounts
-
-├── reports.py          # GET /api/reports/case + /daily
-
-└── websocket.py        # WebSocket /ws/alerts
----
-
-# Prerequisites
-
-| Software | Version | Purpose |
-|----------|---------|---------|
-| Python | 3.10+ | Runtime |
-| PostgreSQL | 15+ | Database |
-| PostGIS | (with PostgreSQL) | Geometry columns |
+- Login → JWT token ✅
+- Jurisdiction scoping — officer sees only own district complaints ✅
+- Ingest → prediction → DB write → `TEST-LIVE-003` → `200 OK` ✅
+- `alert_level: HIGH`, `predicted_atm_id: DEL00001` ✅
+- Failure path — prediction fail → `complaint.status = prediction_failed` ✅
+- Model unavailable → generic 503, no traceback ✅
+- WebSocket broadcast — confirmed via manual test ✅
+- Blockchain down → ingest still returns 200 ✅
+- Latency — steady state 192–240ms ✅
 
 ---
 
-# Installation
+## Pending / In Progress
 
-## Clone Repository
+- Kanav's `alert_dispatch.py` + `ws_auth.py` — PR received, merge pending
+- WebSocket JWT auth tests — not yet run post-merge
+- Admin + Bank Nodal login — not yet tested end-to-end
+- OpenAPI docs — complaints/ingest done, heatmap/reports/mule/evidence TBD
+- Startup script — single command to bring up full stack
+
+---
+
+## Setup
+
+**Requirements:** Python 3.11, PostgreSQL 15 + PostGIS on port 5433, `ML/model.pkl` at repo root
 
 ```bash
-git clone https://github.com/kartike37/cybercrime-prediction-sih
-cd cybercrime-prediction-sih/backend
-```
-
-## Create Virtual Environment
-
-```bash
+cd backend
 python -m venv venv
-```
-
-**Windows (PowerShell):**
-```powershell
-.\venv\Scripts\activate
-```
-
-**Mac / Linux:**
-```bash
-source venv/bin/activate
-```
-
-## Install Dependencies
-
-```bash
+venv\Scripts\activate        # Windows
 pip install -r requirements.txt
 ```
 
----
-
-# Database Setup
-
-### 1. Create database
-
-```sql
-CREATE DATABASE cybercrime_db;
+Create `backend/.env`:
 ```
-
-### 2. Run schema
-
-```bash
-psql -U postgres -d cybercrime_db -f database/schema.sql
-```
-
-### 3. Insert dummy ATM data
-
-```sql
-INSERT INTO atm_locations (atm_id, bank_name, address, district, state, risk_score)
-VALUES
-('ATM-DUMMY-001', 'SBI', 'Connaught Place', 'New Delhi', 'Delhi', 0.75),
-('ATM-DUMMY-002', 'HDFC', 'Karol Bagh', 'New Delhi', 'Delhi', 0.45),
-('ATM-DUMMY-003', 'ICICI', 'Lajpat Nagar', 'New Delhi', 'Delhi', 0.85);
-```
-
-### 4. Insert admin user
-
-```bash
-# Generate bcrypt hash in Python (venv activated):
-from passlib.context import CryptContext
-pwd_context = CryptContext(schemes=["bcrypt"])
-print(pwd_context.hash("CyberSight@2025"))
-```
-
-```sql
-INSERT INTO users (username, password_hash, role)
-VALUES ('admin@cybersight.in', '<generated_hash>', 'admin');
-```
-
----
-
-# Environment Configuration
-
-```bash
-copy .env.example .env
-```
-
-Edit `backend/.env`:
-
-```env
-DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5433/cybercrime_db
-SECRET_KEY=your-secret-key-here
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5433/cybersight
+SECRET_KEY=cybersight-secret-2026
 ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=480
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 GANACHE_URL=http://127.0.0.1:7545
+ACCOUNT_HASH_SALT=9957724d3e3a4deb71e3b9abae516163d431d72a040e0345bc493a166add44f4
 ```
-
----
-
-# Start Server
 
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
----
-
-# Authentication
-
-**Admin credentials:**
-- Username: `admin@cybersight.in`
-- Password: `CyberSight@2025`
-
-**Login:**
-```json
-POST /api/auth/login
-{
-  "username": "admin@cybersight.in",
-  "password": "CyberSight@2025"
-}
+**Demo users** (insert once into DB):
+```sql
+INSERT INTO users (username, password_hash, role, jurisdiction_district, bank_name) VALUES
+('cyber_delhi', '<bcrypt hash of password123>', 'cyber_cell_officer', 'Delhi', NULL),
+('i4c_admin',  '<bcrypt hash of password123>', 'admin', NULL, NULL),
+('bank_sbi',   '<bcrypt hash of password123>', 'bank_nodal_officer', NULL, 'SBI');
 ```
 
-**All protected routes need:**
----
-
-# API Endpoints
-
-## Auth
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/auth/login` | Login — rate limited 5/15min |
-| POST | `/api/auth/logout` | Logout — token revoked |
-
-## Complaints
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/complaints` | List — PII masked, filters: alert_level, fraud_type |
-| GET | `/api/complaints/{id}/full` | Full detail — X-Admin-Confirm: true required |
-| POST | `/api/complaints/ingest` | Full ingest — ML predict, blockchain flag, rate limited 100/hr |
-
-## Dashboard & Heatmap
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/dashboard/stats` | Live stats — high/medium/low counts, weekly trend |
-| GET | `/api/heatmap` | GeoJSON — ATM risk + victim clusters |
-
-## Mule Accounts
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/mule-accounts` | All mule accounts with blockchain_tx_hash |
-
-## Reports
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/reports/case/{complaint_id}` | Individual case report |
-| GET | `/api/reports/daily` | Daily consolidated report |
-
-## WebSocket
-| Path | Description |
-|------|-------------|
-| `ws://localhost:8000/ws/alerts` | Live MEDIUM/HIGH alert broadcast |
-
-## Health
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Server health |
-| GET | `/health/db` | DB connection |
+**ML model:** Place `model.pkl` from `saina-ml` branch at `ML/model.pkl` (repo root level, outside `backend/`).
 
 ---
 
-# ML Integration
+## Key Decisions
 
-**Model:** `backend/app/models/cybersight_model.pkl` (XGBoost, trained by Rishika)
-
-**Predict function:** `backend/app/models/predict.py`
-
-**Input fields used:**
-- district, victim_lat, victim_lon, beneficiary_lat, beneficiary_lon
-- fraud_amount, already_withdrawn, number_of_hops
-- hour, dow, month, is_weekend (calculated from transaction_timestamp)
-- complaints_6h, complaints_24h (real DB query)
-- district_risk_score (default 0.5)
-
-**Output:** predicted_atm_id, predicted_atm_lat/lon, risk_level, fraud_probability, shap_values, freezable_amount, recommended_action, withdrawal_risk_window
-
----
-
-# Integration Status
-
-| Feature | Status | Owner |
-|---------|--------|-------|
-| FastAPI + PostgreSQL | ✅ Done | Kartike |
-| All complaint endpoints | ✅ Done | Kartike |
-| JWT auth + revocation | ✅ Done | Kartike + Kanav |
-| Rate limiting (login + ingest) | ✅ Done | Kartike + Kanav |
-| CORS for frontend | ✅ Done | Kartike |
-| Real ML model (predict()) | ✅ Done | Kartike + Rishika |
-| Blockchain httpx flag call | ✅ Done | Kartike + Aniket |
-| Dashboard stats endpoint | ✅ Done | Kartike |
-| WebSocket live alerts | ✅ Done | Kartike |
-| Admin user setup | ✅ Done | Kartike + Saina |
-| Frontend live wiring | 🔄 In Progress | Himanshu |
-| Rishika laptop setup | ⏳ Day 3 | Rishika + Saina |
-
----
-
-# Team
-
-| Name | Role |
-|------|------|
-| Rishika Garg | ML / Data Engineer |
-| Himanshu Jain | Full Stack Developer |
-| Aniket Dixit | Blockchain Developer |
-| Kartike Rohila | Backend Developer |
-| Saina Sharma | Database Engineer |
-| Kanav Agarwal | Security & Compliance Engineer |
-
----
-
-**Status:** Day 1 Integration Complete ✅  
-**Next:** Day 2 — Himanshu frontend live wiring | Day 3 — End-to-end test + demo dry run
+| Decision | Reason |
+|----------|--------|
+| `atm_density` uses victim coords at inference | Withdrawal coords are the prediction target — circular dependency |
+| `is_festival_period` hardcoded to 0 | Festival dates in model are 2024-only; demo is 2026 |
+| `account_age_days` defaults to 180 | Not available at complaint time |
+| Confidence < 0.4 → ANALYST_REVIEW | Suppress auto-dispatch on uncertain predictions |
+| Blockchain flag non-blocking | Ingest latency must stay under 60s regardless of chain state |
