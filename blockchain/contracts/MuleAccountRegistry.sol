@@ -10,23 +10,32 @@ contract MuleAccountRegistry {
         uint256 riskScore;
         uint256 timestamp;
         string reason;
+        string flaggingAuthority;
+        string evidenceBasis;
     }
 
-    mapping(string => MuleAccount) private muleAccounts;
+    // Plaintext account IDs are NEVER stored.
+    // The key is the keccak256 hash of the account identifier.
+    mapping(bytes32 => MuleAccount) private muleAccounts;
 
     event AccountFlagged(
-        string accountId,
+        bytes32 indexed accountHash,
         uint256 riskScore,
-        uint256 timestamp
+        uint256 timestamp,
+        string flaggingAuthority,
+        string evidenceBasis
     );
 
     event AccountUnflagged(
-        string accountId,
+        bytes32 indexed accountHash,
         uint256 timestamp
     );
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can perform this action");
+        require(
+            msg.sender == owner,
+            "Only owner can perform this action"
+        );
         _;
     }
 
@@ -34,23 +43,50 @@ contract MuleAccountRegistry {
         owner = msg.sender;
     }
 
+    function _hashAccount(
+        string memory accountId
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(accountId));
+    }
+
     function flagAccount(
         string memory accountId,
         uint256 riskScore,
-        string memory reason
+        string memory reason,
+        string memory flaggingAuthority,
+        string memory evidenceBasis
     ) public onlyOwner {
 
-        muleAccounts[accountId] = MuleAccount({
+        require(
+            bytes(flaggingAuthority).length > 0,
+            "Flagging authority required"
+        );
+
+        require(
+            keccak256(bytes(evidenceBasis)) ==
+                keccak256(bytes("INVESTIGATION_VERIFIED")) ||
+            keccak256(bytes(evidenceBasis)) ==
+                keccak256(bytes("MONITORING_SUSPECTED")),
+            "Invalid evidence basis"
+        );
+
+        bytes32 accountHash = _hashAccount(accountId);
+
+        muleAccounts[accountHash] = MuleAccount({
             flagged: true,
             riskScore: riskScore,
             timestamp: block.timestamp,
-            reason: reason
+            reason: reason,
+            flaggingAuthority: flaggingAuthority,
+            evidenceBasis: evidenceBasis
         });
 
         emit AccountFlagged(
-            accountId,
+            accountHash,
             riskScore,
-            block.timestamp
+            block.timestamp,
+            flaggingAuthority,
+            evidenceBasis
         );
     }
 
@@ -58,15 +94,17 @@ contract MuleAccountRegistry {
         string memory accountId
     ) public onlyOwner {
 
+        bytes32 accountHash = _hashAccount(accountId);
+
         require(
-            muleAccounts[accountId].flagged,
+            muleAccounts[accountHash].flagged,
             "Account not flagged"
         );
 
-        muleAccounts[accountId].flagged = false;
+        muleAccounts[accountHash].flagged = false;
 
         emit AccountUnflagged(
-            accountId,
+            accountHash,
             block.timestamp
         );
     }
@@ -75,7 +113,9 @@ contract MuleAccountRegistry {
         string memory accountId
     ) public view returns (bool) {
 
-        return muleAccounts[accountId].flagged;
+        bytes32 accountHash = _hashAccount(accountId);
+
+        return muleAccounts[accountHash].flagged;
     }
 
     function getAccountDetails(
@@ -87,16 +127,24 @@ contract MuleAccountRegistry {
             bool flagged,
             uint256 riskScore,
             uint256 timestamp,
-            string memory reason
+            string memory reason,
+            string memory flaggingAuthority,
+            string memory evidenceBasis,
+            bytes32 accountHash
         )
     {
-        MuleAccount memory account = muleAccounts[accountId];
+        accountHash = _hashAccount(accountId);
+
+        MuleAccount memory account = muleAccounts[accountHash];
 
         return (
             account.flagged,
             account.riskScore,
             account.timestamp,
-            account.reason
+            account.reason,
+            account.flaggingAuthority,
+            account.evidenceBasis,
+            accountHash
         );
     }
 }
