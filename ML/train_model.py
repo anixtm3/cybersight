@@ -45,7 +45,7 @@ print(f"Loaded {len(df)} rows")
 
 print("Loading ATM district mapping...")
 atm_query = """
-    SELECT atm_id, district, 
+    SELECT atm_id, district, bank_name,
            ST_X(location::geometry) as lon,
            ST_Y(location::geometry) as lat
     FROM atm_locations
@@ -187,5 +187,6 @@ print(f"\n── Final Results ──")
 print(f"Naive baseline:  {naive_baseline*100:.1f}%")
 print(f"Top-1:  {top1_acc*100:.1f}% | Top-3: {top3_acc*100:.1f}% | Top-5: {top5_acc*100:.1f}%")
 print(f"Improvement: +{(top1_acc - naive_baseline)*100:.1f} pp over naive baseline")
+print(f"atm_df columns: {list(atm_df.columns)}")
 
 conn.close()
