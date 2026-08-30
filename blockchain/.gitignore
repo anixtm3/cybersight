@@ -10,17 +10,28 @@ venv/
 .venv/
 env/
 
-# Environment Variables
+# Environment Variables / Secrets
 .env
+.env.*
+!.env.example
 
 # ===========================
 # Node.js
 # ===========================
 node_modules/
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
+# ===========================
 # Hardhat
+# ===========================
 cache/
+
+# Generated Hardhat metadata
+artifacts/build-info/
+artifacts/contracts/**/*.dbg.json
+
 
 # ===========================
 # IDEs
