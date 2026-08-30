@@ -333,7 +333,6 @@ blockchain/
 ├── config.yaml
 ├── requirements.txt
 │
-├── .env
 ├── .gitignore
 ├── hardhat.config.js
 ├── package.json
