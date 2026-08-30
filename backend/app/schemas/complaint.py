@@ -170,4 +170,7 @@ class ActionLogResponse(BaseModel):
     created_at: Optional[datetime] = None
 
     class Config:
-        from_attributes = True
+        from_attributes = True  
+
+class LogoutRequest(BaseModel):
+    token: str

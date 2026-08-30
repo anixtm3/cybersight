@@ -1,4 +1,3 @@
-from app.routers import complaints, predict, auth, ingest, heatmap, websocket, reports, mule, evidence
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,7 +13,14 @@ import os
 
 from app.database import engine, SessionLocal
 from app.models.complaint import RevokedToken, Complaint
-from app.routers import complaints, predict, auth, ingest, heatmap, websocket, reports, mule
+# FIX (Item 5): this was previously imported twice — once alone at the
+# top of the file, then again in a second line that also imported
+# everything else but omitted `evidence`. Consolidated into one import,
+# and `evidence` is now included AND actually registered below (it was
+# imported before but app.include_router(evidence.router) was never
+# called, so every evidence-module endpoint was unreachable regardless
+# of whether the route file itself was correct).
+from app.routers import complaints, predict, auth, ingest, heatmap, websocket, reports, mule, evidence
 
 from app.rate_limit import limiter
 
@@ -120,6 +126,7 @@ app.include_router(heatmap.router)
 app.include_router(websocket.router)
 app.include_router(reports.router)
 app.include_router(mule.router)
+app.include_router(evidence.router)   # FIX (Item 5): was imported but never registered — added
 
 
 @app.get("/")

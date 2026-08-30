@@ -1,9 +1,9 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from typing import List
+# from app.ws_auth import authenticate_websocket# app/ws_auth.py — TEMPORARY LOCAL STUB, merge ke waqt Kanav ki asli file se REPLACE karna hai
 
 router = APIRouter(tags=["websocket"])
 
-# Connected clients list
 active_connections: List[WebSocket] = []
 
 
@@ -15,19 +15,11 @@ async def broadcast(message: dict):
             await connection.send_json(message)
         except Exception:
             disconnected.append(connection)
-    
-    # Dead connections remove karo
     for conn in disconnected:
         active_connections.remove(conn)
 
-
-@router.websocket("/ws/alerts")
-async def websocket_alerts(websocket: WebSocket):
+async def authenticate_websocket(websocket: WebSocket):
+    """PLACEHOLDER — asli implementation Kanav ke merge se aayegi."""
     await websocket.accept()
-    active_connections.append(websocket)
-    try:
-        while True:
-            # Client se message wait karo (ping/pong)
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        active_connections.remove(websocket)
+    await websocket.close(code=4001, reason="Auth not yet merged locally")
+    return None

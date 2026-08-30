@@ -25,6 +25,8 @@ class Complaint(Base):
     beneficiary_account_type = Column(String(50))
     beneficiary_account = Column(String(100))
     beneficiary_bank = Column(String(200))
+    beneficiary_lat = Column(Float)   # ADDED — required by ingest contract, column exists in DB via migration
+    beneficiary_lon = Column(Float)   # ADDED — same as above
     upi_id = Column(String(100))
     mobile_number = Column(String(20))
     number_of_hops = Column(Integer, default=0)
@@ -43,6 +45,12 @@ class ATMLocation(Base):
     district = Column(String(100))
     state = Column(String(100))
     risk_score = Column(Numeric(5, 2), default=0)
+    # NOTE: `location` (PostGIS geometry) is NOT mapped here — accessing
+    # atm.location via the ORM will raise AttributeError. It was written
+    # via raw SQL in scripts/seed_atms.py, bypassing the ORM entirely.
+    # To map it properly: `pip install geoalchemy2`, then add
+    #   from geoalchemy2 import Geometry
+    #   location = Column(Geometry(geometry_type='POINT', srid=4326))
 
 
 class KeywordFraudMap(Base):
@@ -73,6 +81,8 @@ class Prediction(Base):
     model_version = Column(String(50))
     alert_sent = Column(Boolean, default=False)
     predicted_at = Column(TIMESTAMP, server_default=func.now())
+    gate_decision = Column(String(20))  
+    gate_reason = Column(Text)    
 
 
 class AlertDispatchLog(Base):
@@ -134,6 +144,7 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(20), default='cyber_cell_officer')
     jurisdiction_district = Column(Text)
+    bank_name = Column(String(100))   # ADDED — for Bank Nodal Officer RBAC scoping, column exists in DB via migration
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 
