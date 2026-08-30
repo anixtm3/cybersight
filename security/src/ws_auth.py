@@ -1,5 +1,6 @@
 from fastapi import WebSocket
-from rbac import get_current_user_from_token
+from app.auth_core import get_user_from_raw_token
+from app.database import SessionLocal
 
 
 async def authenticate_websocket(websocket: WebSocket):
@@ -16,9 +17,12 @@ async def authenticate_websocket(websocket: WebSocket):
         await websocket.close(code=4001, reason="Missing token")
         return None
 
+    db = SessionLocal()
     try:
-        user = get_current_user_from_token(token)
+        user = get_user_from_raw_token(db, token)
         return user
     except Exception:
         await websocket.close(code=4001, reason="Invalid or expired token")
         return None
+    finally:
+        db.close()

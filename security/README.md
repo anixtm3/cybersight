@@ -18,7 +18,9 @@ claim. Alert dispatcher wired to a database matching Kartike's
 dispatch_log schema exactly (SQLite locally, drop-in replacement
 for Postgres in production). Real backend integration verified:
 login, JWT decode, and jurisdiction enforcement all tested
-successfully against Kartike's live backend.
+successfully against Kartike's live backend. Jurisdiction logic
+verified against all 10 real production districts (Delhi, Delhi NCR,
+Mumbai, Jamtara, Bengaluru, Hyderabad, Agra, Patna, Pune, Lucknow).
 
 ## Files
 
@@ -35,7 +37,7 @@ successfully against Kartike's live backend.
 | 08-rate-limiting-api-abuse-protection.md | Rate limiting and API abuse protection |
 | 09-pii-protection-data-privacy.md | PII masking and data minimization |
 | 10-audit-logging-security-events.md | Audit logging and security event tracking |
-| 11-testing-evidence.md | Independent and live-backend testing evidence (22 pytest tests + real integration test) |
+| 11-testing-evidence.md | Independent and live-backend testing evidence (37 pytest tests + real integration test) |
 
 ## Code
 
@@ -51,7 +53,7 @@ successfully against Kartike's live backend.
 | src/mock_app.py | Standalone FastAPI app - login, RBAC routes, evidence log, alert trigger |
 | src/ws_auth.py | WebSocket authentication for /ws/alerts (JWT-gated, first-message auth) |
 | src/evidence_ui.html | Standalone evidence documentation UI (local prototype, no backend yet) |
-| src/test_security.py | Automated pytest suite (22 tests) for all security modules |
+| src/test_security.py | Automated pytest suite (37 tests) for all security modules |
 | requirements.txt | Python dependencies for the security module |
 
 ## Testing
@@ -61,10 +63,11 @@ Run the automated test suite:
     cd security/src
     pytest test_security.py -v
 
-22 tests covering PII masking, password security, RBAC, jurisdiction
-scoping, alert dispatch, dispatch log DB writes, WebSocket
-authentication, and evidence log/alert-trigger endpoint
-authorization. All passing as of last run.
+37 tests covering PII masking, password security, RBAC, jurisdiction
+scoping across all 10 real districts, alert dispatch, dispatch log
+DB writes, and evidence log/alert-trigger endpoint authorization.
+34 passing, 3 skipped (WebSocket tests pending merge into Kartike's
+backend, since ws_auth.py now depends on his app.auth_core module).
 
 ## Confirmed Backend Contract (from Kartike)
 

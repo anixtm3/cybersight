@@ -188,7 +188,26 @@ Three scenarios tested:
 - Invalid/malformed token: connection closed with code 4001
 
 Total automated test count: 22 (all passing).
-
 Code: security/src/ws_auth.py (authenticate_websocket function),
 using rbac.get_current_user_from_token() for token validation
 outside the HTTP Header dependency context.
+
+
+### Test 11 - All 10 Real Districts Verified
+
+Saina confirmed final DB schema and the 10 real district names used
+in production: Delhi, Delhi NCR, Mumbai, Jamtara, Bengaluru,
+Hyderabad, Agra, Patna, Pune, Lucknow.
+
+require_jurisdiction() tested against all 10 districts individually
+(same-district access) plus 5 cross-district pairs (access denial):
+
+- All 10 same-district cases: 200 OK, access granted
+- All 5 cross-district cases: 403 Forbidden, access denied
+
+Total automated test count: 37 (34 passing, 3 skipped pending
+merge into Kartike's backend for ws_auth.py-dependent tests).
+
+Field mapping confirmed: DB column jurisdiction_district maps to
+JWT claim jurisdiction (intentional naming difference per Kartike's
+auth_core.py design) - no code change required in require_jurisdiction().
