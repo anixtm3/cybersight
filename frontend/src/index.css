@@ -1,0 +1,220 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  body {
+    @apply bg-white text-gray-900 text-sm antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold;
+  }
+
+  /* Custom focus ring — navy, 2px, offset — for keyboard navigation */
+  :focus-visible {
+    outline: 2px solid #1a2e5a;
+    outline-offset: 2px;
+  }
+  /* Remove default blue outline for non-keyboard focus */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Consistent icon stroke weight across the entire app */
+  svg.lucide {
+    stroke-width: 1.5;
+  }
+}
+
+@layer components {
+  .label {
+    @apply font-medium text-gray-600;
+    font-size: 12px;
+    line-height: 1.25rem;
+  }
+  .btn-touch {
+    @apply inline-flex items-center justify-center gap-2 rounded-md font-medium;
+    min-height: 44px;
+    min-width: 44px;
+    transition: background-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+                border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+                color 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .nav-item {
+    @apply flex items-center gap-3 px-5 text-white/80;
+    min-height: 44px;
+    font-size: 14px;
+    transition: background-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+                color 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .nav-item:hover {
+    @apply bg-navy-light text-white;
+  }
+  .nav-item-active {
+    @apply bg-navy-light text-white border-l-4 border-info;
+  }
+
+  /* Tactical corner-bracket card */
+  .tac-card {
+    @apply bg-white border border-navy/15 rounded-[3px] relative;
+  }
+  .tac-card::before,
+  .tac-card::after {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    pointer-events: none;
+  }
+  .tac-card::before {
+    top: 0;
+    left: 0;
+    border-top: 1.5px solid #1a2e5a;
+    border-left: 1.5px solid #1a2e5a;
+  }
+  .tac-card::after {
+    bottom: 0;
+    right: 0;
+    border-bottom: 1.5px solid #1a2e5a;
+    border-right: 1.5px solid #1a2e5a;
+  }
+  .tac-card-accent::before {
+    border-top-color: #ea580c;
+    border-left-color: #ea580c;
+  }
+  .tac-card-accent::after {
+    border-bottom-color: #ea580c;
+    border-right-color: #ea580c;
+  }
+
+  /* Monospace data value */
+  .data-mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  /* Background grid texture */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgba(26, 46, 90, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(26, 46, 90, 0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+}
+
+/* Pulsing status dot */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+.status-dot-pulse {
+  animation: pulse-dot 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #1a1a2e;
+}
+/* Dark-theme filter applied ONLY to the tile pane so that
+   overlay panes (markers, GeoJSON polygons, tooltips) keep
+   their original colors. */
+.leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.8);
+}
+/* Ensure GeoJSON overlay pane renders above tiles with full opacity */
+.leaflet-overlay-pane svg {
+  z-index: 400 !important;
+}
+.leaflet-overlay-pane svg path {
+  transition: fill-opacity 150ms ease;
+}
+.leaflet-tooltip.cybersight-tooltip {
+  background: #1a2e5a;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 10px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.25);
+}
+.leaflet-tooltip.cybersight-tooltip::before {
+  border-top-color: #1a2e5a;
+}
+
+/* === Custom scrollbar — thin track, navy-gray thumb === */
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 transparent;
+}
+/* Chrome / Edge / Safari */
+.scroll-thin::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scroll-thin::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 3px;
+}
+.scroll-thin::-webkit-scrollbar-thumb:hover,
+*::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+.scroll-thin::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes logoFadeIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+.logo-fade-in {
+  animation: logoFadeIn 0.5s ease-out;
+}
+
+/* === Transition animations (150-250ms, custom easing) === */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0.5; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); opacity: 0.5; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slide-in-left {
+  animation: slide-in-left 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Route transition wrapper */
+.route-transition {
+  animation: fade-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Hover transition utility */
+.hover-transition {
+  transition: background-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
