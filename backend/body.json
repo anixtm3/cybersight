@@ -1,0 +1,12 @@
+{
+  "complaint_id": "TEST-ML-002",
+  "complaint_text": "olx fraud paid 20000 for phone second hand goods",
+  "victim_district": "Noida",
+  "victim_state": "UP",
+  "victim_lat": 28.5355,
+  "victim_lon": 77.3910,
+  "amount_lost": 20000,
+  "mobile_number": "9876543210",
+  "number_of_hops": 3,
+  "transaction_amount": 20000
+}
