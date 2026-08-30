@@ -1,9 +1,7 @@
 from audit_log import log_event
-from dispatch_db import init_dispatch_log_table, write_dispatch_log
+from dispatch_db import write_dispatch_log
 
 DISPATCH_LOG = []
-
-init_dispatch_log_table()
 
 
 def send_sms(to: str, message: str, complaint_id: str = None) -> dict:
@@ -57,7 +55,6 @@ def send_webhook(url: str, payload: dict, complaint_id: str = None) -> dict:
 def dispatch_alert(zone: str, risk_level: str, recipients: dict, complaint_id: str = None) -> list:
     results = []
     message = f"High-risk zone detected: {zone} (risk: {risk_level})"
-
     if "phone" in recipients:
         results.append(send_sms(recipients["phone"], message, complaint_id))
     if "email" in recipients:
@@ -72,5 +69,4 @@ def dispatch_alert(zone: str, risk_level: str, recipients: dict, complaint_id: s
                 complaint_id,
             )
         )
-
     return results
