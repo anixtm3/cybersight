@@ -52,7 +52,7 @@ Mumbai, Jamtara, Bengaluru, Hyderabad, Agra, Patna, Pune, Lucknow).
 | src/dispatch_db.py | Database layer matching Kartike's confirmed dispatch_log schema |
 | src/mock_app.py | Standalone FastAPI app - login, RBAC routes, evidence log, alert trigger |
 | src/ws_auth.py | WebSocket authentication for /ws/alerts (JWT-gated, first-message auth) |
-| src/evidence_ui.html | Standalone evidence documentation UI (local prototype, no backend yet) |
+| src/evidence_ui.html | Evidence documentation UI wired to real backend (/api/complaints/{id}/notes and /actions) |
 | src/test_security.py | Automated pytest suite (37 tests) for all security modules |
 | requirements.txt | Python dependencies for the security module |
 
@@ -90,11 +90,10 @@ backend, since ws_auth.py now depends on his app.auth_core module).
   production, pii_masking.py kept as standalone/backup module.
   Origin of complaints.py masking still unconfirmed by either
   Saina or Kartike, but this is non-blocking.
-- Evidence documentation UI is currently local-only (browser
-  localStorage); needs to be wired to the real endpoints
-  (/api/complaints/{complaint_id}/notes and
-  /api/complaints/{complaint_id}/actions, confirmed by Kartike -
-  not /evidence-log as originally assumed).
+- Evidence documentation UI wired to /api/complaints/{id}/notes
+  and /actions. Not yet live-tested end-to-end (backend URL and
+  a real JWT token entered manually in the UI); will work as-is
+  once a stable backend URL is available.
 
 ## Dispatch Log DB
 

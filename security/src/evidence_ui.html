@@ -12,78 +12,126 @@
   button:hover { background: #2ea043; }
   .entry { border: 1px solid #30363d; border-radius: 6px; padding: 12px; margin-top: 12px; background: #161b22; }
   .entry-meta { font-size: 12px; color: #9da7b1; }
+  .error { color: #f85149; font-size: 13px; margin-top: 8px; }
+  .config-note { font-size: 12px; color: #d29922; background: #2b2111; padding: 8px; border-radius: 6px; margin-bottom: 16px; }
 </style>
 </head>
 <body>
 
 <h1>CyberSight - Evidence Documentation</h1>
-<p style="color:#9da7b1; font-size:14px;">Investigator case notes and action logging (Day 1 prototype - local only, no backend yet)</p>
+<p style="color:#9da7b1; font-size:14px;">Investigator case notes and action logging</p>
 
-<label for="caseId">Case ID</label>
+<div class="config-note" id="config-note"></div>
+
+<label for="apiBase">Backend API base URL</label>
+<input type="text" id="apiBase" placeholder="e.g. https://your-backend-url.com" value="">
+
+<label for="authToken">JWT access token</label>
+<input type="text" id="authToken" placeholder="Paste your access_token here">
+
+<label for="caseId">Complaint / Case ID</label>
 <input type="text" id="caseId" placeholder="e.g. CS-2026-00123">
 
-<label for="investigator">Investigator Name</label>
-<input type="text" id="investigator" placeholder="e.g. Kanav Agarwal">
-
-<label for="actionType">Action Type</label>
-<select id="actionType">
-  <option>Evidence Reviewed</option>
-  <option>CCTV Preservation Requested</option>
-  <option>Mule Account Flagged</option>
-  <option>Alert Acknowledged</option>
-  <option>Case Note</option>
+<label for="entryType">Entry Type</label>
+<select id="entryType">
+  <option value="notes">Note</option>
+  <option value="actions">Action</option>
 </select>
 
-<label for="notes">Notes</label>
-<textarea id="notes" rows="4" placeholder="Describe the action or finding..."></textarea>
+<label for="notes">Content</label>
+<textarea id="notes" rows="4" placeholder="Describe the note or action..."></textarea>
 
-<button onclick="addEntry()">Log Entry</button>
+<button onclick="submitEntry()">Submit</button>
+<div id="submit-error" class="error"></div>
 
-<h2 style="margin-top:30px; font-size:16px;">Case Log</h2>
+<h2 style="margin-top:30px; font-size:16px;">Fetched Entries</h2>
+<button onclick="fetchEntries()" style="background:#30363d">Refresh</button>
 <div id="log"></div>
+<div id="fetch-error" class="error"></div>
 
 <script>
-let entries = JSON.parse(localStorage.getItem("cybersight_evidence_log") || "[]");
+const API_BASE_KEY = "cybersight_api_base";
+const savedBase = localStorage.getItem(API_BASE_KEY) || "";
+document.getElementById("apiBase").value = savedBase;
 
-function render() {
-  const log = document.getElementById("log");
-  log.innerHTML = "";
-  entries.slice().reverse().forEach(e => {
-    const div = document.createElement("div");
-    div.className = "entry";
-    div.innerHTML = `
-      <div><strong>${e.actionType}</strong> - Case ${e.caseId}</div>
-      <div>${e.notes}</div>
-      <div class="entry-meta">By ${e.investigator} at ${e.timestamp}</div>
-    `;
-    log.appendChild(div);
-  });
+const configNote = document.getElementById("config-note");
+configNote.textContent = savedBase
+  ? `Connected to: ${savedBase}`
+  : "Backend URL not set yet - enter it above before submitting or fetching entries.";
+
+document.getElementById("apiBase").addEventListener("change", (e) => {
+  localStorage.setItem(API_BASE_KEY, e.target.value.trim());
+  configNote.textContent = e.target.value.trim()
+    ? `Connected to: ${e.target.value.trim()}`
+    : "Backend URL not set yet - enter it above before submitting or fetching entries.";
+});
+
+function getConfig() {
+  const base = document.getElementById("apiBase").value.trim().replace(/\/$/, "");
+  const token = document.getElementById("authToken").value.trim();
+  return { base, token };
 }
 
-function addEntry() {
+async function submitEntry() {
+  const errorEl = document.getElementById("submit-error");
+  errorEl.textContent = "";
+
+  const { base, token } = getConfig();
   const caseId = document.getElementById("caseId").value.trim();
-  const investigator = document.getElementById("investigator").value.trim();
-  const actionType = document.getElementById("actionType").value;
+  const entryType = document.getElementById("entryType").value;
   const notes = document.getElementById("notes").value.trim();
 
-  if (!caseId || !investigator || !notes) {
-    alert("Please fill in Case ID, Investigator Name, and Notes.");
+  if (!base) { errorEl.textContent = "Enter the backend API base URL first."; return; }
+  if (!token) { errorEl.textContent = "Enter a JWT access token first."; return; }
+  if (!caseId) { errorEl.textContent = "Enter a complaint/case ID first."; return; }
+  if (!notes) { errorEl.textContent = "Enter some content first."; return; }
+
+  const url = `${base}/api/complaints/${encodeURIComponent(caseId)}/${entryType}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ content: notes }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      errorEl.textContent = `Request failed (${response.status}): ${text}`;
+      return;
+    }
+
+    document.getElementById("notes").value = "";
+    fetchEntries();
+  } catch (err) {
+    errorEl.textContent = `Network error: ${err.message}`;
+  }
+}
+
+async function fetchEntries() {
+  const errorEl = document.getElementById("fetch-error");
+  errorEl.textContent = "";
+  const log = document.getElementById("log");
+
+  const { base, token } = getConfig();
+  const caseId = document.getElementById("caseId").value.trim();
+  const entryType = document.getElementById("entryType").value;
+
+  if (!base || !token || !caseId) {
+    errorEl.textContent = "Fill in backend URL, token, and case ID first.";
     return;
   }
 
-  const entry = {
-    caseId, investigator, actionType, notes,
-    timestamp: new Date().toISOString()
-  };
-  entries.push(entry);
-  localStorage.setItem("cybersight_evidence_log", JSON.stringify(entries));
+  const url = `${base}/api/complaints/${encodeURIComponent(caseId)}/${entryType}`;
 
-  document.getElementById("notes").value = "";
-  render();
-}
+  try {
+    const response = await fetch(url, {
+      headers: { "Authorization": `Bearer ${token}` },
+    });
 
-render();
-</script>
-
-</body>
-</html>
+    if (!response.ok) {
+      const text = await response.text();
+      errorEl.textContent = `Fetch failed (${response.status}):

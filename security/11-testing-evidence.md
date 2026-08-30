@@ -211,3 +211,24 @@ merge into Kartike's backend for ws_auth.py-dependent tests).
 Field mapping confirmed: DB column jurisdiction_district maps to
 JWT claim jurisdiction (intentional naming difference per Kartike's
 auth_core.py design) - no code change required in require_jurisdiction().
+
+
+### Test 12 - Evidence UI Wired to Real Endpoints
+
+evidence_ui.html updated from local-only (browser localStorage) to a
+real HTTP client, targeting Kartike's confirmed endpoints:
+
+- POST /api/complaints/{complaint_id}/notes
+- POST /api/complaints/{complaint_id}/actions
+- GET (same paths) for fetching existing entries
+
+Backend URL and JWT token are entered manually in the UI (saved to
+localStorage for convenience across page reloads) rather than
+hardcoded, since the live backend URL changes (tunnel-based during
+development). All requests include proper error handling - invalid
+URL, missing token, failed request, and network errors all surface
+a visible message instead of failing silently.
+
+Not yet live-tested against the real backend (URL pending from
+Kartike/Saina); code is ready and will work as soon as a stable
+backend URL is available.
