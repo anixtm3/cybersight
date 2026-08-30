@@ -50,7 +50,7 @@ BEGIN
         'CS-' ||
         EXTRACT(YEAR FROM CURRENT_DATE)::TEXT ||
         '-' ||
-        LPAD(nextval('tracking_number_seq')::TEXT, 5, '0');
+        LPAD(nextval('tracking_number_seq')::TEXT, 7, '0');
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
