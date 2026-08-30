@@ -12,9 +12,7 @@ import shap
 import warnings
 warnings.filterwarnings('ignore')
 
-load_dotenv(dotenv_path='database/.env')
-
-# ─── DB CONNECTION ────────────────────────────────────────────────────────────
+load_dotenv(dotenv_path='DB/.env')
 
 conn = psycopg2.connect(
     dbname="cybersight",
@@ -23,8 +21,6 @@ conn = psycopg2.connect(
     host="localhost",
     port="5433"
 )
-
-# ─── LOAD DATA ───────────────────────────────────────────────────────────────
 
 print("Loading data from DB...")
 query = """
@@ -47,8 +43,6 @@ query = """
 df = pd.read_sql(query, conn)
 print(f"Loaded {len(df)} rows")
 
-# ─── GET ATM DISTRICT MAPPING ────────────────────────────────────────────────
-
 print("Loading ATM district mapping...")
 atm_query = """
     SELECT atm_id, district, 
@@ -63,8 +57,6 @@ df['withdrawal_district'] = df['target_atm_id'].map(atm_district_map)
 df = df.dropna(subset=['withdrawal_district'])
 print(f"After district mapping: {len(df)} rows")
 print(f"Withdrawal district distribution:\n{df['withdrawal_district'].value_counts()}")
-
-# ─── FEATURE ENGINEERING ─────────────────────────────────────────────────────
 
 print("\nPreparing features...")
 
@@ -102,14 +94,15 @@ n_classes = len(le_target.classes_)
 print(f"Classes (withdrawal districts): {n_classes}")
 print(f"Districts: {list(le_target.classes_)}")
 
-# ─── TRAIN/TEST SPLIT ────────────────────────────────────────────────────────
+# Naive baseline
+most_common_district = df['withdrawal_district'].value_counts().index[0]
+naive_baseline = df['withdrawal_district'].value_counts().iloc[0] / len(df)
+print(f"\nNaive baseline (always predict '{most_common_district}'): {naive_baseline*100:.1f}%")
 
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 print(f"\nTrain: {len(X_train)} | Test: {len(X_test)}")
-
-# ─── TRAIN MODEL ─────────────────────────────────────────────────────────────
 
 print("\nTraining XGBoost classifier...")
 model = XGBClassifier(
@@ -132,8 +125,6 @@ model.fit(
     verbose=50
 )
 
-# ─── EVALUATE ────────────────────────────────────────────────────────────────
-
 y_pred       = model.predict(X_test)
 y_pred_proba = model.predict_proba(X_test)
 
@@ -142,27 +133,23 @@ top3_acc = top_k_accuracy_score(y_test, y_pred_proba, k=3)
 top5_acc = top_k_accuracy_score(y_test, y_pred_proba, k=5)
 
 print(f"\n── Evaluation ──")
-print(f"Top-1 Accuracy: {top1_acc*100:.1f}%")
-print(f"Top-3 Accuracy: {top3_acc*100:.1f}%")
-print(f"Top-5 Accuracy: {top5_acc*100:.1f}%")
-
-# ─── SHAP ────────────────────────────────────────────────────────────────────
+print(f"Naive baseline:  {naive_baseline*100:.1f}%")
+print(f"Top-1 Accuracy:  {top1_acc*100:.1f}%")
+print(f"Top-3 Accuracy:  {top3_acc*100:.1f}%")
+print(f"Top-5 Accuracy:  {top5_acc*100:.1f}%")
+print(f"Improvement:     +{(top1_acc - naive_baseline)*100:.1f} percentage points")
 
 print("\nComputing SHAP values (sample 300 rows)...")
 explainer   = shap.TreeExplainer(model)
 shap_sample = X_test.sample(300, random_state=42)
 shap_values = explainer.shap_values(shap_sample)
 
-# shap_values shape: (n_samples, n_features, n_classes) or (n_classes, n_samples, n_features)
 shap_array = np.array(shap_values)
 print(f"SHAP array shape: {shap_array.shape}")
 
-# Handle both possible shapes
 if shap_array.ndim == 3:
-    # (n_samples, n_features, n_classes) → mean over samples and classes
     if shap_array.shape[2] == n_classes:
         mean_shap = np.abs(shap_array).mean(axis=0).mean(axis=1)
-    # (n_classes, n_samples, n_features) → mean over classes and samples
     elif shap_array.shape[0] == n_classes:
         mean_shap = np.abs(shap_array).mean(axis=0).mean(axis=0)
     else:
@@ -174,22 +161,22 @@ shap_importance = pd.Series(mean_shap, index=FEATURES).sort_values(ascending=Fal
 print("\nTop 10 important features (SHAP):")
 print(shap_importance.head(10))
 
-# ─── SAVE MODEL ──────────────────────────────────────────────────────────────
-
 print("\nSaving model...")
 model_package = {
-    'model':            model,
-    'features':         FEATURES,
-    'le_fraud':         le_fraud,
-    'le_bank':          le_bank,
-    'le_district':      le_district,
-    'le_target':        le_target,
-    'top1_accuracy':    top1_acc,
-    'top3_accuracy':    top3_acc,
-    'top5_accuracy':    top5_acc,
-    'shap_importance':  shap_importance.to_dict(),
-    'atm_df':           atm_df,
-    'district_classes': list(le_target.classes_)
+    'model':                    model,
+    'features':                 FEATURES,
+    'le_fraud':                 le_fraud,
+    'le_bank':                  le_bank,
+    'le_district':              le_district,
+    'le_target':                le_target,
+    'top1_accuracy':            top1_acc,
+    'top3_accuracy':            top3_acc,
+    'top5_accuracy':            top5_acc,
+    'naive_baseline':           naive_baseline,
+    'naive_baseline_district':  most_common_district,
+    'shap_importance':          shap_importance.to_dict(),
+    'atm_df':                   atm_df,
+    'district_classes':         list(le_target.classes_)
 }
 
 with open('ML/model.pkl', 'wb') as f:
@@ -197,6 +184,8 @@ with open('ML/model.pkl', 'wb') as f:
 
 print("✅ Model saved to ML/model.pkl")
 print(f"\n── Final Results ──")
-print(f"Top-1: {top1_acc*100:.1f}% | Top-3: {top3_acc*100:.1f}% | Top-5: {top5_acc*100:.1f}%")
+print(f"Naive baseline:  {naive_baseline*100:.1f}%")
+print(f"Top-1:  {top1_acc*100:.1f}% | Top-3: {top3_acc*100:.1f}% | Top-5: {top5_acc*100:.1f}%")
+print(f"Improvement: +{(top1_acc - naive_baseline)*100:.1f} pp over naive baseline")
 
 conn.close()
