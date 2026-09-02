@@ -15,7 +15,6 @@ interface AuthCtx {
   logout: () => void;
 }
 
-// Role profiles — shape (user, login, logout) stays stable for API swap.
 const mockProfiles: Record<UserRole, CurrentUser> = {
   cyber_cell_officer: {
     name: 'Inspector R. Sharma',
@@ -34,6 +33,12 @@ const mockProfiles: Record<UserRole, CurrentUser> = {
   },
 };
 
+const roleCredentials: Record<UserRole, { username: string; password: string }> = {
+  cyber_cell_officer: { username: 'cyber_delhi', password: 'password123' },
+  bank_nodal_officer: { username: 'bank_sbi', password: 'password123' },
+  i4c_admin: { username: 'i4c_admin', password: 'password123' },
+};
+
 const AuthContext = createContext<AuthCtx>({
   user: null,
   token: null,
@@ -45,14 +50,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
-  const login = (role: UserRole) => {
+  const login = async (role: UserRole) => {
+    try {
+      const creds = roleCredentials[role];
+      const resp = await fetch('http://localhost:8000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: creds.username, password: creds.password }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setToken(data.access_token);
+        sessionStorage.setItem('cybersight_token', data.access_token);
+      } else {
+        // fallback — simulated token
+        const sim = `sim-${role}-${Date.now()}`;
+        setToken(sim);
+        sessionStorage.setItem('cybersight_token', sim);
+      }
+    } catch {
+      const sim = `sim-${role}-${Date.now()}`;
+      setToken(sim);
+      sessionStorage.setItem('cybersight_token', sim);
+    }
     setUser(mockProfiles[role]);
-    // Simulated JWT — in production this comes from POST /api/auth/login
-    setToken(`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify({ role, iat: Date.now() }))}.simulated-signature`);
   };
+
   const logout = () => {
     setUser(null);
     setToken(null);
+    sessionStorage.removeItem('cybersight_token');
   };
 
   return (

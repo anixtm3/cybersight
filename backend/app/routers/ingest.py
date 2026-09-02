@@ -288,7 +288,13 @@ async def ingest_complaint(complaint_data: IngestRequest, request: Request, db: 
                     "atm_lon": primary_atm["lon"] if primary_atm else None,
                     "recommended_action": prediction_data["recommended_action"],
                     "freezable_amount": prediction_data["freezable_amount"],
-                    "timestamp": str(datetime.utcnow())
+                    "timestamp": str(datetime.utcnow()),
+                    "dispatch_status": {
+                        "sms": "pending",
+                        "email": "pending",
+                        "webhook": "sent",
+                        "dashboard": "sent"
+                    }
                 })
             except Exception:
                 pass

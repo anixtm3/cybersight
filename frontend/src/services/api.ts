@@ -38,6 +38,19 @@ export const postAlertAction = async (alertId: string, action: string) => {
 };
 
 // ============================================================
+// HELPERS
+// ============================================================
+
+function getToken(): string {
+  return sessionStorage.getItem('cybersight_token') ?? '';
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
+// ============================================================
 // REPORTS
 // ============================================================
 
@@ -58,7 +71,7 @@ export interface FetchResult<T> {
   isDemo: boolean;
 }
 
-// --- Mock fallback data (used when API fails or returns empty) ---
+// --- Mock fallback data ---
 
 const mockDispatchLog: DispatchLogRow[] = [
   { complaint_id: 'NCCT-202409001', channel: 'sms', recipient: '+91-98xxx-xxx42', dispatched_at: '2026-08-29T09:14:22Z', delivery_status: 'sent', raw_response: 'ACK msg_id=DLV44820' },
@@ -137,11 +150,25 @@ export async function fetchReport(
   const qs = params.toString();
   const url = `${API_BASE_URL}${reportEndpointMap[type]}${qs ? `?${qs}` : ''}`;
   try {
-    const resp = await fetch(url);
+    const resp = await fetch(url, { headers: authHeaders() });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const rows = (await resp.json()) as ReportRow[];
+    const json = await resp.json();
+    const rows = (json.data ?? json) as ReportRow[];
     if (!rows || rows.length === 0) throw new Error('Empty response');
-    return { data: rows, isDemo: false };
+    const mapped = rows.map((r: any) => {
+      const count = r.complaint_count ?? r.total_complaints ?? 0;
+      const total = r.total_amount_lost ?? 0;
+      return {
+        group_label: r.group_label ?? r.district ?? r.bank ?? r.fraud_type ?? '',
+        complaint_count: count,
+        total_amount_lost: total,
+        avg_amount_lost: r.avg_amount_lost ?? (count > 0 ? Math.round(total / count) : 0),
+        high_alert_count: r.high_alert_count ?? 0,
+        medium_alert_count: r.medium_alert_count ?? 0,
+        low_alert_count: r.low_alert_count ?? 0,
+      };
+    });
+    return { data: mapped, isDemo: false };
   } catch {
     return new Promise((resolve) => {
       setTimeout(() => resolve({ data: mockReports[type], isDemo: true }), 300);
@@ -164,7 +191,7 @@ export async function exportReportCsv(
   params.set('format', 'csv');
   const url = `${API_BASE_URL}/api/reports/export?${params.toString()}`;
   try {
-    const resp = await fetch(url);
+    const resp = await fetch(url, { headers: authHeaders() });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return await resp.blob();
   } catch {
@@ -199,7 +226,7 @@ export async function fetchDispatchLog(
   const qs = params.toString();
   const url = `${API_BASE_URL}/api/alerts/dispatch-log${qs ? `?${qs}` : ''}`;
   try {
-    const resp = await fetch(url);
+    const resp = await fetch(url, { headers: authHeaders() });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const rows = (await resp.json()) as DispatchLogRow[];
     if (!rows || rows.length === 0) throw new Error('Empty response');

@@ -6,7 +6,7 @@ import {
   type ShapFeatureRow,
   type AtmPrediction,
 } from '@/services/mockApi';
-import { type AlertItem, formatCurrency } from '@/mockData';
+import { formatCurrency } from '@/mockData';
 import {
   fetchDispatchLog,
   exportReportCsv,
@@ -42,7 +42,7 @@ function formatDate(iso: string): string {
 
 function atmRowsHtml(atms: AtmPrediction[]): string {
   if (atms.length === 0) {
-    return '<tr><td colspan="5" style="text-align:center;padding:16px;color:#666;">No ATM predictions available</td></tr>';
+    return '<tr><td colspan="4" style="text-align:center;padding:16px;color:#666;">No ATM predictions available</td></tr>';
   }
   return atms
     .map(
@@ -51,25 +51,7 @@ function atmRowsHtml(atms: AtmPrediction[]): string {
         <td>${i + 1}</td>
         <td style="font-family:monospace;">${esc(a.atm_id)}</td>
         <td>${esc(a.bank_name)}</td>
-        <td>${a.lat.toFixed(4)}, ${a.lon.toFixed(4)}</td>
         <td style="text-align:right;font-weight:bold;">${a.risk_score.toFixed(1)}</td>
-      </tr>`,
-    )
-    .join('');
-}
-
-function shapRowsHtml(rows: ShapFeatureRow[]): string {
-  if (rows.length === 0) {
-    return '<tr><td colspan="4" style="text-align:center;padding:16px;color:#666;">No SHAP data available</td></tr>';
-  }
-  return rows
-    .map(
-      (r) => `
-      <tr>
-        <td>${esc(featureLabel(r.feature))}</td>
-        <td style="text-align:right;">${r.shap_impact_lat.toFixed(2)}</td>
-        <td style="text-align:right;">${r.shap_impact_lon.toFixed(2)}</td>
-        <td style="text-align:right;font-weight:bold;">${r.combined_importance.toFixed(2)}</td>
       </tr>`,
     )
     .join('');
@@ -97,36 +79,37 @@ function dispatchRowsHtml(entries: DispatchEntry[]): string {
     .join('');
 }
 
-function complaintRowsHtml(alert: AlertItem): string {
-  if (alert.linkedComplaints.length === 0) {
-    return '<tr><td colspan="5" style="text-align:center;padding:16px;color:#666;">No linked complaints</td></tr>';
-  }
-  return alert.linkedComplaints
-    .map(
-      (c) => `
-      <tr>
-        <td style="font-family:monospace;">${esc(c.id)}</td>
-        <td>${esc(c.fraudType)}</td>
-        <td>${esc(c.reporter)}</td>
-        <td style="text-align:right;font-weight:bold;">${formatCurrency(c.amount)}</td>
-        <td style="font-family:monospace;font-size:11px;">${formatDate(c.timestamp)}</td>
-      </tr>`,
-    )
-    .join('');
-}
-
 export async function generateCasePdf(
-  alert: AlertItem,
+  alert: any,
   investigatorAction: string | null,
 ): Promise<void> {
-  const [shapData, topAtms, dispatchResult] = await Promise.all([
-    fetchShapExplanation(alert.id).catch(() => null),
-    fetchTopAtmPredictions().catch(() => [] as AtmPrediction[]),
+  const [dispatchResult] = await Promise.all([
     fetchDispatchLog(alert.id).catch(() => ({ data: [], isDemo: true })),
   ]);
 
-  const shapRows = shapData?.shap_values ?? [];
-  const shapSummary = shapRows.length > 0 ? generateShapSummary(shapRows) : 'No SHAP summary available.';
+  const shapRows: ShapFeatureRow[] = alert.shapValues
+    ? Object.entries(alert.shapValues).map(([feature, value]) => ({
+        feature,
+        shap_impact_lat: value as number,
+        shap_impact_lon: value as number,
+        combined_importance: Math.abs(value as number),
+      }))
+    : [];
+
+  const shapSummary = shapRows.length > 0
+    ? generateShapSummary(shapRows)
+    : 'No SHAP summary available.';
+
+  const topAtms: AtmPrediction[] = alert.atmId
+    ? [{
+        atm_id: alert.atmId,
+        bank_name: 'Predicted ATM',
+        lat: 0,
+        lon: 0,
+        risk_score: alert.riskScore,
+      }]
+    : [];
+
   const dispatchEntries: DispatchEntry[] = (dispatchResult as { data: DispatchLogRow[] }).data.map((d) => ({
     channel: d.channel,
     recipient: d.recipient,
@@ -134,7 +117,26 @@ export async function generateCasePdf(
     dispatchedAt: d.dispatched_at,
   }));
 
-  const totalAtRisk = alert.linkedComplaints.reduce((s, c) => s + c.amount, 0);
+  const normalizedAlert = {
+    id: alert.id,
+    district: alert.district || '',
+    state: alert.state || '',
+    riskLevel: alert.riskLevel || 'HIGH',
+    riskScore: alert.riskScore || 0,
+    fraudType: alert.fraudType || '',
+    predictedWithdrawalWindow: alert.predictedWithdrawalWindow || 'Next 4 hours',
+    timestamp: alert.timestamp || new Date().toISOString(),
+    muleAccounts: alert.muleAccounts || 0,
+    linkedComplaints: (alert.linkedComplaints || []).map((c: any) => ({
+      id: c.id,
+      fraudType: c.fraudType || '',
+      reporter: c.reporter || '',
+      amount: c.amount || 0,
+      timestamp: c.timestamp || new Date().toISOString(),
+    })),
+  };
+
+  const totalAtRisk = normalizedAlert.linkedComplaints.reduce((s: number, c: any) => s + c.amount, 0);
   const generatedAt = new Date().toLocaleString('en-IN', {
     day: '2-digit',
     month: 'short',
@@ -148,7 +150,7 @@ export async function generateCasePdf(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Case Report — ${esc(alert.id)}</title>
+<title>Case Report — ${esc(normalizedAlert.id)}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a2e5a; padding: 32px; background: #fff; }
@@ -183,62 +185,27 @@ export async function generateCasePdf(
     </div>
     <div class="meta">
       <div>Generated: ${generatedAt}</div>
-      <div style="margin-top:4px;">Case ID: ${esc(alert.id)}</div>
+      <div style="margin-top:4px;">Case ID: ${esc(normalizedAlert.id)}</div>
     </div>
   </div>
 
   <div class="section">
     <h2>Case Overview</h2>
     <div class="case-info">
-      <div>
-        <div class="label">Case ID</div>
-        <div class="value" style="font-family:monospace;">${esc(alert.id)}</div>
-      </div>
-      <div>
-        <div class="label">District</div>
-        <div class="value">${esc(alert.district)}, ${esc(alert.state)}</div>
-      </div>
-      <div>
-        <div class="label">Risk Score</div>
-        <div class="value">
-          <span class="risk-badge risk-${esc(alert.riskLevel)}">${esc(alert.riskLevel)} · ${alert.riskScore}</span>
-        </div>
-      </div>
-      <div>
-        <div class="label">Fraud Type</div>
-        <div class="value">${esc(alert.fraudType)}</div>
-      </div>
-      <div>
-        <div class="label">Predicted Withdrawal Window</div>
-        <div class="value">${esc(alert.predictedWithdrawalWindow)}</div>
-      </div>
-      <div>
-        <div class="label">Alert Timestamp</div>
-        <div class="value" style="font-family:monospace;font-size:12px;">${formatDate(alert.timestamp)}</div>
-      </div>
-      <div>
-        <div class="label">Mule Accounts</div>
-        <div class="value">${alert.muleAccounts}</div>
-      </div>
-      <div>
-        <div class="label">Total Amount at Risk</div>
-        <div class="value" style="font-weight:800;">${formatCurrency(totalAtRisk)}</div>
-      </div>
+      <div><div class="label">Case ID</div><div class="value" style="font-family:monospace;">${esc(normalizedAlert.id)}</div></div>
+      <div><div class="label">District</div><div class="value">${esc(normalizedAlert.district)}, ${esc(normalizedAlert.state)}</div></div>
+      <div><div class="label">Risk Score</div><div class="value"><span class="risk-badge risk-${esc(normalizedAlert.riskLevel)}">${esc(normalizedAlert.riskLevel)} · ${normalizedAlert.riskScore}</span></div></div>
+      <div><div class="label">Fraud Type</div><div class="value">${esc(normalizedAlert.fraudType)}</div></div>
+      <div><div class="label">Predicted Withdrawal Window</div><div class="value">${esc(normalizedAlert.predictedWithdrawalWindow)}</div></div>
+      <div><div class="label">Mule Accounts</div><div class="value">${normalizedAlert.muleAccounts}</div></div>
+      <div><div class="label">Total Amount at Risk</div><div class="value" style="font-weight:800;">${formatCurrency(totalAtRisk)}</div></div>
     </div>
   </div>
 
   <div class="section">
-    <h2>Predicted ATMs — Withdrawal Hotspots</h2>
+    <h2>Predicted ATM — Withdrawal Hotspot</h2>
     <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>ATM ID</th>
-          <th>Bank</th>
-          <th>Coordinates (Lat, Lon)</th>
-          <th style="text-align:right;">Risk Score</th>
-        </tr>
-      </thead>
+      <thead><tr><th>#</th><th>ATM ID</th><th>Bank</th><th style="text-align:right;">Risk Score</th></tr></thead>
       <tbody>${atmRowsHtml(topAtms)}</tbody>
     </table>
   </div>
@@ -247,29 +214,15 @@ export async function generateCasePdf(
     <h2>SHAP Feature Attribution — ML Model Explanation</h2>
     <div class="summary-box" style="margin-bottom:12px;">${esc(shapSummary)}</div>
     <table>
-      <thead>
-        <tr>
-          <th>Feature</th>
-          <th style="text-align:right;">Lat Impact</th>
-          <th style="text-align:right;">Lon Impact</th>
-          <th style="text-align:right;">Combined Importance</th>
-        </tr>
-      </thead>
-      <tbody>${shapRowsHtml(shapRows)}</tbody>
+      <thead><tr><th>Feature</th><th style="text-align:right;">Impact</th></tr></thead>
+      <tbody>${shapRows.map(r => `<tr><td>${esc(featureLabel(r.feature))}</td><td style="text-align:right;font-weight:bold;">${r.combined_importance.toFixed(4)}</td></tr>`).join('')}</tbody>
     </table>
   </div>
 
   <div class="section">
-    <h2>Dispatch Status — Alert Notifications</h2>
+    <h2>Dispatch Status</h2>
     <table>
-      <thead>
-        <tr>
-          <th>Channel</th>
-          <th>Recipient</th>
-          <th>Status</th>
-          <th>Dispatched At</th>
-        </tr>
-      </thead>
+      <thead><tr><th>Channel</th><th>Recipient</th><th>Status</th><th>Dispatched At</th></tr></thead>
       <tbody>${dispatchRowsHtml(dispatchEntries)}</tbody>
     </table>
   </div>
@@ -277,25 +230,17 @@ export async function generateCasePdf(
   <div class="section">
     <h2>Linked Complaints</h2>
     <table>
-      <thead>
-        <tr>
-          <th>Complaint ID</th>
-          <th>Fraud Type</th>
-          <th>Reporter</th>
-          <th style="text-align:right;">Amount</th>
-          <th>Timestamp</th>
-        </tr>
-      </thead>
-      <tbody>${complaintRowsHtml(alert)}</tbody>
+      <thead><tr><th>Complaint ID</th><th>Fraud Type</th><th>Reporter</th><th style="text-align:right;">Amount</th><th>Timestamp</th></tr></thead>
+      <tbody>${normalizedAlert.linkedComplaints.map((c: any) => `<tr><td style="font-family:monospace;">${esc(c.id)}</td><td>${esc(c.fraudType)}</td><td>${esc(c.reporter)}</td><td style="text-align:right;font-weight:bold;">${formatCurrency(c.amount)}</td><td style="font-family:monospace;font-size:11px;">${formatDate(c.timestamp)}</td></tr>`).join('')}</tbody>
     </table>
   </div>
 
   <div class="section">
-    <h2>Investigator Action Taken</h2>
+    <h2>Investigator Action</h2>
     <div class="action-box">
       ${investigatorAction
         ? `<strong>Action:</strong> ${esc(investigatorAction)}<br/><strong>Recorded at:</strong> ${generatedAt}`
-        : '<em>No action recorded yet for this case.</em>'
+        : '<em>No action recorded yet.</em>'
       }
     </div>
   </div>
@@ -315,13 +260,11 @@ export async function generateCasePdf(
   const url = URL.createObjectURL(blob);
   const win = window.open(url, '_blank');
   if (!win) {
-    // Popup blocked — fallback: create a download link
     const link = document.createElement('a');
     link.href = url;
-    link.download = `case-report-${alert.id}.html`;
+    link.download = `case-report-${normalizedAlert.id}.html`;
     link.click();
   }
-  // Clean up after a delay to allow the new window to load
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 

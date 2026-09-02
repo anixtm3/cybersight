@@ -1,5 +1,5 @@
 contract:
-  address: '0x909457ddC90cd429C140027ea776d070cD99137a'
+  address: '0xD6509d99224db6CfD71C6d17cd80eEC3D6a0fA3c'
 ganache:
   rpc_url: http://127.0.0.1:7545
 abi:

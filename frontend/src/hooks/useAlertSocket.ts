@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { generatePredictionEvent, generateInitialEvents, type PredictionEvent } from '@/services/mockApi';
-import { WS_ALERTS_URL } from '@/config';
+import type { PredictionEvent } from '@/services/mockApi';
+import { API_BASE_URL } from '@/config';
 
-type ConnState = 'connecting' | 'connected' | 'reconnecting' | 'mock' | 'auth_failed';
+type ConnState = 'connecting' | 'connected' | 'reconnecting' | 'auth_failed';
 
 interface UseAlertSocket {
   events: PredictionEvent[];
@@ -11,45 +11,32 @@ interface UseAlertSocket {
   authFailReason: string | null;
 }
 
-// Wraps native WebSocket. Connects to real backend endpoint by default.
-// Sends JWT auth token as first message on open. If token is missing,
-// does not connect at all. Handles 4001 close as auth failure.
-// If URL is unreachable, falls back to a mock generator that pushes a
-// new alert every 5-8 seconds so the UI is demonstrable standalone.
 export function useAlertSocket(url: string | null, token: string | null): UseAlertSocket {
   const [events, setEvents] = useState<PredictionEvent[]>([]);
   const [connState, setConnState] = useState<ConnState>('connecting');
   const [authFailReason, setAuthFailReason] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttempts = useRef(0);
 
-  const scheduleMockAlert = useCallback(() => {
-    const delay = 5000 + Math.random() * 3000; // 5-8 seconds
-    mockTimer.current = setTimeout(() => {
-      setEvents((prev) => [generatePredictionEvent(), ...prev].slice(0, 100));
-      scheduleMockAlert();
-    }, delay);
-  }, []);
-
-  const startMockMode = useCallback(() => {
-    setConnState('mock');
-    setEvents((prev) => (prev.length === 0 ? generateInitialEvents(6) : prev));
-    if (mockTimer.current) clearTimeout(mockTimer.current);
-    scheduleMockAlert();
-  }, [scheduleMockAlert]);
+  const fetchRecentAlerts = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/alerts/recent?limit=20`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.alerts && data.alerts.length > 0) {
+        setEvents(data.alerts as PredictionEvent[]);
+      }
+    } catch {
+      // silent fail
+    }
+  }, [token]);
 
   const connect = useCallback(() => {
-    if (!url) {
-      startMockMode();
-      return;
-    }
-
-    // Do not connect without a token — backend will reject with 4001
-    if (!token) {
-      startMockMode();
-      return;
-    }
+    if (!url || !token) return;
 
     try {
       const ws = new WebSocket(url);
@@ -58,75 +45,61 @@ export function useAlertSocket(url: string | null, token: string | null): UseAle
       setAuthFailReason(null);
 
       ws.onopen = () => {
-        // Send auth token as the very first message
         ws.send(JSON.stringify({ token }));
         setConnState('connected');
-        if (mockTimer.current) clearTimeout(mockTimer.current);
+        reconnectAttempts.current = 0;
+        fetchRecentAlerts();
       };
 
       ws.onmessage = (e) => {
         try {
           const data = JSON.parse(e.data) as Partial<PredictionEvent>;
-          // Ensure dispatch_pending flag is set (WS payload doesn't include dispatch status)
-          if (data.dispatch_pending === undefined) {
-            data.dispatch_pending = true;
-          }
+          if (data.type === 'ping') return;
           setEvents((prev) => [data as PredictionEvent, ...prev].slice(0, 100));
         } catch {
-          // ignore malformed messages
+          // ignore malformed
         }
       };
 
       ws.onclose = (ev) => {
         if (ev.code === 4001) {
-          // Auth failure — don't retry, won't resolve with same token
-          console.error(`WebSocket auth failed (4001): ${ev.reason}`);
           setConnState('auth_failed');
           setAuthFailReason(ev.reason || 'Token required');
-          if (mockTimer.current) clearTimeout(mockTimer.current);
           return;
         }
-
-        // Other close codes — normal disconnect or network issue, retry
-        setConnState('reconnecting');
-        if (!mockTimer.current) scheduleMockAlert();
-        reconnectTimer.current = setTimeout(() => connect(), 3000);
+        if (reconnectAttempts.current < 5) {
+          setConnState('reconnecting');
+          const delay = Math.min(1000 * 2 ** reconnectAttempts.current, 15000);
+          reconnectAttempts.current += 1;
+          reconnectTimer.current = setTimeout(connect, delay);
+        }
       };
 
       ws.onerror = () => {
         ws.close();
       };
     } catch {
-      startMockMode();
+      setConnState('reconnecting');
     }
-  }, [url, token, scheduleMockAlert, startMockMode]);
+  }, [url, token, fetchRecentAlerts]);
 
   useEffect(() => {
-    // Seed initial events immediately so UI isn't empty
-    setEvents(generateInitialEvents(6));
-
     if (!url || !token) {
-      startMockMode();
-      return () => {
-        if (mockTimer.current) clearTimeout(mockTimer.current);
-      };
+      setConnState('reconnecting');
+      return;
     }
-
-    // Try connecting with a short timeout — if it fails, go mock
-    const fallbackTimer = setTimeout(() => {
-      if (connState !== 'connected') startMockMode();
-    }, 2000);
-
     connect();
 
     return () => {
       if (wsRef.current) wsRef.current.close();
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
-      if (mockTimer.current) clearTimeout(mockTimer.current);
-      if (fallbackTimer) clearTimeout(fallbackTimer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, token]);
 
-  return { events, connState, isLive: connState === 'connected', authFailReason };
+  return {
+    events,
+    connState,
+    isLive: connState === 'connected',
+    authFailReason,
+  };
 }

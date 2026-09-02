@@ -30,15 +30,12 @@ export default function Login() {
   const [authenticating, setAuthenticating] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
 
-  const handleLogin = (role: UserRole) => {
-    setSelectedRole(role);
-    setAuthenticating(true);
-    // Simulate brief auth delay for smooth UX — no flash
-    setTimeout(() => {
-      login(role);
-      navigate('/dashboard');
-    }, 400);
-  };
+  const handleLogin = async (role: UserRole) => {
+  setSelectedRole(role);
+  setAuthenticating(true);
+  await login(role);  // wait for real JWT
+  navigate('/dashboard');
+};
 
   return (
     <div className="min-h-screen bg-white bg-grid flex items-center justify-center p-6">
