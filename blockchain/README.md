@@ -162,14 +162,14 @@ mapping(bytes32 => MuleAccount) private muleAccounts;
 
 ## Stored Information
 
-| Field               | Type                | Description                              |
-| ------------------- | ------------------- | ---------------------------------------- |
-| flagged             | `bool`              | Whether the account is currently flagged |
-| riskScore           | `uint256`           | Mule account risk score                  |
+| Field               | Type                | Description                                 |
+| ------------------- | ------------------- | --------------------------------------------|
+| flagged             | `bool`              | Whether the account is currently flagged    |
+| riskScore           | `uint256`           | Mule account risk score                     |
 | timestamp           | `uint256`           | Unix timestamp when the account was flagged |
-| reason              | `string`            | Reason for flagging                      |
-| flaggingAuthority   | `string`            | Authority that flagged the account       |
-| evidenceBasis       | `string`            | Classification of evidence (see below)   |
+| reason              | `string`            | Reason for flagging                         |
+| flaggingAuthority   | `string`            | Authority that flagged the account          |
+| evidenceBasis       | `string`            | Classification of evidence (see below)      |
 
 ## Data Structure
 
