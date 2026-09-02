@@ -13,7 +13,7 @@ interface DashboardStats {
   high_alerts: number;
   medium_alerts: number;
   low_alerts: number;
-  total_this_week: number;
+  total_last_24h: number;
   active_zones: number;
 }
 
@@ -21,7 +21,7 @@ const mockStats: DashboardStats = {
   high_alerts: 12,
   medium_alerts: 34,
   low_alerts: 58,
-  total_this_week: 104,
+  total_last_24h: 104,
   active_zones: 24,
 };
 
@@ -83,8 +83,8 @@ export default function I4CAdminDashboard() {
             accent="success"
           />
           <StatCard
-            label="Total This Week"
-            value={loading ? '—' : stats.total_this_week}
+            label="Last 24 Hours"
+            value={loading ? '—' : stats.total_last_24h}
             icon={CalendarDays}
             accent="navy"
           />

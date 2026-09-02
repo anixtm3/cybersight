@@ -1,13 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import Navbar from '@/components/Navbar';
 import Sidebar from '@/components/Sidebar';
-import { Search, ShieldCheck, Lock, Users, AlertCircle } from 'lucide-react';
-import {
-  fetchMuleRegistry,
-  fetchMuleAccount,
-  type MuleAccount,
-  type EvidenceBasis,
-} from '@/services/mockApi';
+import { Search, ShieldCheck, Lock, Users } from 'lucide-react';
+import { type EvidenceBasis, type MuleAccount } from '@/services/mockApi';
+import { API_BASE_URL } from '@/config';
 import { SkeletonTable, EmptyState, RetryErrorState, Spinner } from '@/components/Loading';
 
 const evidenceBadge: Record<EvidenceBasis, { label: string; className: string }> = {
@@ -42,9 +38,30 @@ export default function MuleRegistryPage() {
   const load = useCallback(() => {
     setLoading(true);
     setError(false);
-    fetchMuleRegistry()
+    const token = sessionStorage.getItem('cybersight_token') ?? '';
+    fetch(`${API_BASE_URL}/api/mule-accounts`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
-        setAccounts(data);
+        const mapped = (Array.isArray(data) ? data : []).map((m: any, i: number) => ({
+          flag_id: `FLAG-${String(i + 1).padStart(3, '0')}`,
+          account_hash: m.account_number
+            ? `0x${m.account_number.slice(0, 4)}...${m.account_number.slice(-4)}`
+            : '0x????...????',
+          tx_hash: m.blockchain_tx_hash ?? '0x' + '0'.repeat(64),
+          flagging_authority: m.bank_name ?? 'CyberSight-AutoDispatch',
+          evidence_basis: (m.is_red_flagged
+            ? 'INVESTIGATION_VERIFIED'
+            : 'MONITORING_SUSPECTED') as EvidenceBasis,
+          risk_score: Math.round((m.risk_score ?? 0.5) * 100),
+          block_timestamp: m.red_flagged_at ?? new Date().toISOString(),
+          flag_reason: `Fraud complaint auto-flagged by CyberSight ML`,
+        }));
+        setAccounts(mapped);
         setLoading(false);
       })
       .catch(() => {
@@ -62,16 +79,15 @@ export default function MuleRegistryPage() {
     setDetailLoading(true);
     setDetailError(false);
     setCopied(false);
-    fetchMuleAccount(selectedFlagId)
-      .then((data) => {
-        setDetail(data ?? null);
-        setDetailLoading(false);
-      })
-      .catch(() => {
-        setDetailError(true);
-        setDetailLoading(false);
-      });
-  }, [selectedFlagId]);
+    const found = accounts.find((a) => a.flag_id === selectedFlagId);
+    if (found) {
+      setDetail(found);
+      setDetailLoading(false);
+    } else {
+      setDetailError(true);
+      setDetailLoading(false);
+    }
+  }, [selectedFlagId, accounts]);
 
   useEffect(() => {
     if (selectedFlagId) loadDetail();
@@ -82,7 +98,8 @@ export default function MuleRegistryPage() {
       a.flag_id.toLowerCase().includes(query.toLowerCase()) ||
       a.account_hash.toLowerCase().includes(query.toLowerCase()) ||
       a.flagging_authority.toLowerCase().includes(query.toLowerCase());
-    const matchesEvidence = evidenceFilter === 'all' || a.evidence_basis === evidenceFilter;
+    const matchesEvidence =
+      evidenceFilter === 'all' || a.evidence_basis === evidenceFilter;
     return matchesQuery && matchesEvidence;
   });
 
@@ -130,7 +147,11 @@ export default function MuleRegistryPage() {
                 }`}
                 style={{ minHeight: 36 }}
               >
-                {s === 'all' ? 'All' : s === 'INVESTIGATION_VERIFIED' ? 'Verified' : 'Suspected'}
+                {s === 'all'
+                  ? 'All'
+                  : s === 'INVESTIGATION_VERIFIED'
+                  ? 'Verified'
+                  : 'Suspected'}
               </button>
             ))}
           </div>
@@ -182,7 +203,11 @@ export default function MuleRegistryPage() {
                         {a.account_hash}
                       </td>
                       <td className="px-4 py-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold data-mono ${riskBadgeClass(a.risk_score)}`}>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold data-mono ${riskBadgeClass(
+                            a.risk_score
+                          )}`}
+                        >
                           {a.risk_score}
                         </span>
                       </td>
@@ -190,7 +215,11 @@ export default function MuleRegistryPage() {
                         {a.flag_reason}
                       </td>
                       <td className="px-4 py-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-bold ${evidenceBadge[a.evidence_basis].className}`}>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-bold ${
+                            evidenceBadge[a.evidence_basis].className
+                          }`}
+                        >
                           {evidenceBadge[a.evidence_basis].label}
                         </span>
                       </td>
@@ -217,7 +246,6 @@ export default function MuleRegistryPage() {
               onClick={() => setSelectedFlagId(null)}
             />
             <div className="fixed right-0 top-navbar bottom-0 w-[480px] bg-white border-l border-navy/15 z-[600] flex flex-col shadow-xl animate-slide-in-right">
-              {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                 <div className="flex items-center gap-2">
                   <ShieldCheck size={18} className="text-navy" />
@@ -232,7 +260,6 @@ export default function MuleRegistryPage() {
                 </button>
               </div>
 
-              {/* Detail content */}
               <div className="flex-1 overflow-y-auto scroll-thin p-5">
                 {detailLoading ? (
                   <Spinner label="Retrieving on-chain proof…" />
@@ -243,19 +270,14 @@ export default function MuleRegistryPage() {
                   />
                 ) : detail ? (
                   <div className="space-y-4 transition-opacity duration-200">
-                    {/* Flag ID */}
                     <div>
                       <p className="label mb-1">Flag ID</p>
                       <p className="text-sm font-medium text-navy data-mono">{detail.flag_id}</p>
                     </div>
-
-                    {/* Account hash */}
                     <div>
                       <p className="label mb-1">Account Hash</p>
                       <p className="text-sm font-mono text-gray-600">{detail.account_hash}</p>
                     </div>
-
-                    {/* Transaction hash with copy */}
                     <div>
                       <p className="label mb-1">Transaction Hash</p>
                       <div className="flex items-center gap-2">
@@ -271,36 +293,36 @@ export default function MuleRegistryPage() {
                         </button>
                       </div>
                     </div>
-
-                    {/* Flagging authority */}
                     <div>
                       <p className="label mb-1">Flagging Authority</p>
-                      <p className="text-sm font-medium text-navy data-mono">{detail.flagging_authority}</p>
+                      <p className="text-sm font-medium text-navy data-mono">
+                        {detail.flagging_authority}
+                      </p>
                     </div>
-
-                    {/* Evidence basis */}
                     <div>
                       <p className="label mb-1">Evidence Basis</p>
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full border text-xs font-bold ${evidenceBadge[detail.evidence_basis].className}`}>
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full border text-xs font-bold ${
+                          evidenceBadge[detail.evidence_basis].className
+                        }`}
+                      >
                         {evidenceBadge[detail.evidence_basis].label}
                       </span>
                     </div>
-
-                    {/* Risk score */}
                     <div>
                       <p className="label mb-1">Risk Score</p>
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded text-sm font-bold data-mono ${riskBadgeClass(detail.risk_score)}`}>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded text-sm font-bold data-mono ${riskBadgeClass(
+                          detail.risk_score
+                        )}`}
+                      >
                         {detail.risk_score}
                       </span>
                     </div>
-
-                    {/* Flag reason */}
                     <div>
                       <p className="label mb-1">Flag Reason</p>
                       <p className="text-sm text-gray-600">{detail.flag_reason}</p>
                     </div>
-
-                    {/* Block timestamp — immutable styling */}
                     <div className="border-t border-gray-100 pt-3">
                       <div className="flex items-center gap-2 mb-1">
                         <Lock size={12} className="text-gray-400" />

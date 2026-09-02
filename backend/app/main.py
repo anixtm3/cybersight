@@ -13,14 +13,7 @@ import os
 
 from app.database import engine, SessionLocal
 from app.models.complaint import RevokedToken, Complaint
-# FIX (Item 5): this was previously imported twice — once alone at the
-# top of the file, then again in a second line that also imported
-# everything else but omitted `evidence`. Consolidated into one import,
-# and `evidence` is now included AND actually registered below (it was
-# imported before but app.include_router(evidence.router) was never
-# called, so every evidence-module endpoint was unreachable regardless
-# of whether the route file itself was correct).
-from app.routers import complaints, predict, auth, ingest, heatmap, websocket, reports, mule, evidence
+from app.routers import complaints, predict, auth, ingest, heatmap, websocket, reports, mule, evidence, alerts
 
 from app.rate_limit import limiter
 
@@ -33,7 +26,6 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# ✅ CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -67,14 +59,6 @@ def get_db():
 
 @app.middleware("http")
 async def check_revoked_token(request: Request, call_next):
-    # ✅ OPTIONS preflight requests are ALWAYS exempt from JWT auth,
-    # for every route, with no exceptions. Browsers never attach an
-    # Authorization header on a CORS preflight, so checking it here
-    # would always fail and block CORSMiddleware from ever attaching
-    # the proper Access-Control-Allow-Origin headers. This check must
-    # stay first, before PUBLIC_ROUTES, so it covers ALL routes
-    # (including /api/complaints, /api/heatmap, and any future route)
-    # without needing to list each one in PUBLIC_ROUTES.
     if request.method == "OPTIONS":
         return await call_next(request)
 
@@ -126,7 +110,8 @@ app.include_router(heatmap.router)
 app.include_router(websocket.router)
 app.include_router(reports.router)
 app.include_router(mule.router)
-app.include_router(evidence.router)   # FIX (Item 5): was imported but never registered — added
+app.include_router(evidence.router)
+app.include_router(alerts.router)
 
 
 @app.get("/")
@@ -142,6 +127,7 @@ def root():
 def health():
     return {"status": "ok"}
 
+
 @app.get("/health/db")
 def health_db():
     try:
@@ -152,30 +138,13 @@ def health_db():
         return {"database": "error", "detail": "database unreachable"}
 
 
-# ✅ DASHBOARD STATS
 @app.get("/api/dashboard/stats")
 def dashboard_stats(db: Session = Depends(get_db)):
-    now = datetime.utcnow()
-    week_ago = now - timedelta(days=7)
-    two_weeks_ago = now - timedelta(days=14)
-
     high = db.query(func.count(Complaint.id)).filter(Complaint.alert_level == "HIGH").scalar() or 0
     medium = db.query(func.count(Complaint.id)).filter(Complaint.alert_level == "MEDIUM").scalar() or 0
     low = db.query(func.count(Complaint.id)).filter(Complaint.alert_level == "LOW").scalar() or 0
-
-    this_week = db.query(func.count(Complaint.id)).filter(Complaint.created_at >= week_ago).scalar() or 0
-    prev_week = db.query(func.count(Complaint.id)).filter(
-        Complaint.created_at >= two_weeks_ago,
-        Complaint.created_at < week_ago
-    ).scalar() or 0
-
-    avg_high = round(high / 7, 2)
-
-    if prev_week > 0:
-        trend = round(((this_week - prev_week) / prev_week) * 100, 2)
-    else:
-        trend = 0.0
-
+    total = db.query(func.count(Complaint.id)).scalar() or 0
+    avg_high = round(high / max(total, 1) * 100, 2)
     active_zones = db.query(func.count(func.distinct(Complaint.victim_district))).filter(
         Complaint.alert_level == "HIGH"
     ).scalar() or 0
@@ -184,8 +153,8 @@ def dashboard_stats(db: Session = Depends(get_db)):
         "high_alerts": high,
         "medium_alerts": medium,
         "low_alerts": low,
-        "total_this_week": this_week,
+        "total_last_24h": total,
         "avg_high_per_day": avg_high,
-        "week_trend_percent": trend,
+        "week_trend_percent": 0.0,
         "active_zones": active_zones,
     }

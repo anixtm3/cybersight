@@ -4,3 +4,8 @@ __pycache__/
 *.db
 token.txt
 *.token
+*.csv
+*.pkl
+.env
+.venv/
+node_modules/
