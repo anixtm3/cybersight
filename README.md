@@ -1249,7 +1249,7 @@ All sensitive actions logged to `audit_log` table:
 ### Step 1: Clone Repository
 
 ```bash
-git clone https://github.com/your-org/cybersight.git
+git clone https://github.com/anixtm3/cybersight.git
 cd cybersight
 ```
 
@@ -1878,26 +1878,26 @@ Expected response: 200 OK + prediction with Top-5 ATMs.
 ### Deployment Flow
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│ 1. Developer runs: npm run compile                      │
-│    → Hardhat compiles MuleAccountRegistry.sol           │
-│    → Generates artifacts/contracts/.../MuleAccountRegistry.json (ABI)
+┌──────────────────────────────────────────────────────────────────────┐
+│ 1. Developer runs: npm run compile                                   │
+│    → Hardhat compiles MuleAccountRegistry.sol                        │
+│    → Generates artifacts/contracts/.../MuleAccountRegistry.json (ABI)│
+└────────────────────┬─────────────────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│ 2. Developer runs: python deploy.py                     │
+│    → Connects to Ganache (http://127.0.0.1:7545)        │
+│    → Deploys bytecode to chain                          │
+│    → Saves contract address to config.yaml              │
+│    → Prints: "Contract deployed at 0x..."               │
 └────────────────────┬────────────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────────────┐
-│ 2. Developer runs: python deploy.py                    │
-│    → Connects to Ganache (http://127.0.0.1:7545)       │
-│    → Deploys bytecode to chain                         │
-│    → Saves contract address to config.yaml             │
-│    → Prints: "Contract deployed at 0x..."              │
-└────────────────────┬────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│ 3. Backend service loads contract                      │
-│    → Reads config.yaml (contract address)             │
-│    → Loads ABI from artifacts                         │
-│    → Creates Web3 contract instance                   │
-│    → Ready to accept flag/unflag calls                │
+│ 3. Backend service loads contract                       │
+│    → Reads config.yaml (contract address)               │
+│    → Loads ABI from artifacts                           │
+│    → Creates Web3 contract instance                     │
+│    → Ready to accept flag/unflag calls                  │
 └─────────────────────────────────────────────────────────┘
 ```
 
