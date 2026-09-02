@@ -93,7 +93,7 @@ CyberSight is a five-tier system:
 │  Frontend (React 18 + TypeScript)                       │
 │  • Login, Role-based Dashboards                         │
 │  • Command Centre (live WebSocket feed)                 │
-│  • GIS Heatmap (Leaflet), SHAP Charts (Recharts)       │
+│  • GIS Heatmap (Leaflet), SHAP Charts (Recharts)        │
 │  • Mule Registry, Reports, Dispatch Logs                │
 └────────────────────┬────────────────────────────────────┘
                      │ HTTP(S) + WebSocket
@@ -110,8 +110,8 @@ CyberSight is a five-tier system:
 │  • Rate Limiting: SlowAPI, per-IP limits                │
 └────────────────────┬────────────────────────────────────┘
                      │
-         ┌───────────┼───────────┐
-         │           │           │
+         ┌───────────┼──────────┐
+         │           │          │
 ┌────────▼──────┐ ┌──▼────────┐ │
 │  PostgreSQL + │ │ XGBoost   │ │
 │  PostGIS      │ │ ML Model  │ │
@@ -128,9 +128,9 @@ CyberSight is a five-tier system:
                     ┌───────────▼────────┐
                     │  Ganache Blockchain│
                     │  • MuleAccountReg. │
-                    │  • Solidity         │
+                    │  • Solidity        │
                     │  • Keccak-256      │
-                    │  • Immutable Log    │
+                    │  • Immutable Log   │
                     └────────────────────┘
 ```
 
